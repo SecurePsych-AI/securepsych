@@ -41,12 +41,22 @@ git pull origin dev
 # Create a branch for your work:
 git checkout -b feat/your-feature-name
 
+# While working — stay in sync with dev to avoid drift:
+git pull --rebase origin dev
+
+# If there are conflicts during rebase, resolve them, then:
+git rebase --continue
+
 # Commit as you go:
 git add .
 git commit -m "feat: short description of what you did"
 
 # Push your branch:
 git push origin feat/your-feature-name
+
+# If you've already pushed and just rebased, you'll need to force push:
+# Never just git push --force, only --force-with-lease when needed, if consufued contact us:
+git push --force-with-lease origin feat/your-feature-name 
 
 # Then open a Pull Request on GitHub: your branch → dev
 # Assign Natoli as reviewer.
