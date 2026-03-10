@@ -133,7 +133,7 @@ npm run dev
 | --------------------------- | --------------------------------------------------------- | ---------------------- |
 | Retrieval Engineering (RAG) | Document retrieval and context pipeline                   | Arham, Noble, Mohammed |
 | Summarization               | Document and report summarization workflows               | Arpita                 |
-| Product Design (UI/UX)      | Frontend usability, interface design, and experience flow | Alysze, Zach           |
+| Product Design (UI/UX)      | Frontend usability, interface design, and experience flow | Alyse, Zach           |
 | Compliance & FERPA          | Policy alignment and compliance safeguards                | Jon                    |
 
 ---
