@@ -36,7 +36,7 @@
 ### 📺 Walkthrough
 
 New to the workflow? Watch the setup and PR demo before diving in:
-[Git Collaboration Walkthrough →](https://loom.com/link)
+[Git Collaboration Walkthrough →](https://www.loom.com/share/517cfb7910b04ca498e114aefd20b12e)
 
 ```bash
 # Always sync before starting new work:
