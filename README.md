@@ -10,13 +10,13 @@ Student data never leaves the building. This repository never contains student d
 
 ## Project Status
 
-| Phase | Name | Dates | Status |
-|---|---|---|---|
-| 0 | Research Sprint | Feb 24 – Mar 5 | **Complete** |
-| 1 | Infrastructure & Scaffold | Mar 6 – Mar 10 | **ON-HOLD** |
-| 2 | Core RAG + Summarization | Mar 11 – Mar 28 | **IN PROGRESS** |
-| 3 | Jargon Simplifier + Data Visualization | Mar 29 – Apr 11 | Not started |
-| 4 | Evaluation Task Manager | Apr 12 – May | Future scope |
+| Phase | Name                                   | Dates           | Status          |
+| ----- | -------------------------------------- | --------------- | --------------- |
+| 0     | Research Sprint                        | Feb 24 – Mar 5  | **Complete**    |
+| 1     | Infrastructure & Scaffold              | Mar 6 – Mar 10  | **ON-HOLD**     |
+| 2     | Core RAG + Summarization               | Mar 11 – Mar 28 | **IN PROGRESS** |
+| 3     | Jargon Simplifier + Data Visualization | Mar 29 – Apr 11 | Not started     |
+| 4     | Evaluation Task Manager                | Apr 12 – May    | Future scope    |
 
 **First external milestone:** April 2026 stakeholder demo.
 
@@ -77,21 +77,21 @@ LangSmith tracing: metadata only (token counts, latency). No document content tr
 
 ## Technology Stack
 
-| Layer | Tool | Status |
-|---|---|---|
-| LLM Runtime | Ollama (on-prem) | Confirmed |
-| Base Model | TBD — benchmark in Phase 1 | Pending |
-| AI Framework | LangChain or LlamaIndex | Pending (Research 7) |
-| Vector Store | ChromaDB (local, embedded) | Confirmed |
-| Indexing Strategy | TBD | Pending (Research 1 & 2) |
-| PDF Processing | PyMuPDF (`fitz`) | Confirmed |
-| Backend API | FastAPI (Python) | Confirmed |
-| Frontend | React + Vite + TailwindCSS | Confirmed |
-| Auth | Local JWT (`python-jose`) — no external auth provider | Confirmed |
-| Monitoring | LangSmith (metadata-only tracing) | Confirmed |
-| CI/CD | Gitea + Woodpecker CI (self-hosted) | Confirmed |
-| OS | Ubuntu Server 24.04 LTS | Confirmed |
-| Storage Encryption | LUKS/fscrypt at OS level | Confirmed |
+| Layer              | Tool                                                  | Status                   |
+| ------------------ | ----------------------------------------------------- | ------------------------ |
+| LLM Runtime        | Ollama (on-prem)                                      | Confirmed                |
+| Base Model         | TBD — benchmark in Phase 1                            | Pending                  |
+| AI Framework       | LangChain or LlamaIndex                               | Pending (Research 7)     |
+| Vector Store       | ChromaDB (local, embedded)                            | Confirmed                |
+| Indexing Strategy  | TBD                                                   | Pending (Research 1 & 2) |
+| PDF Processing     | PyMuPDF (`fitz`)                                      | Confirmed                |
+| Backend API        | FastAPI (Python)                                      | Confirmed                |
+| Frontend           | React + Vite + TailwindCSS                            | Confirmed                |
+| Auth               | Local JWT (`python-jose`) — no external auth provider | Confirmed                |
+| Monitoring         | LangSmith (metadata-only tracing)                     | Confirmed                |
+| CI/CD              | Gitea + Woodpecker CI (self-hosted)                   | Confirmed                |
+| OS                 | Ubuntu Server 24.04 LTS                               | Confirmed                |
+| Storage Encryption | LUKS/fscrypt at OS level                              | Confirmed                |
 
 ---
 
@@ -100,11 +100,13 @@ LangSmith tracing: metadata only (token counts, latency). No document content tr
 > Full setup guide will be in `/docs/jumpstart/` once Phase 1 infrastructure is live.
 
 **Prerequisites:**
+
 - Access to the team's on-prem server (LAN only — get the static IP from Kai or Arpita)
 - Python 3.11+, Node.js 20+, Docker
 - Ollama installed and model pulled (see `/docs/jumpstart/`)
 
 **Environment setup:**
+
 ```bash
 # Clone the repo
 git clone https://github.com/securepsych-ai/securepsych.git
@@ -126,6 +128,17 @@ npm run dev
 
 ---
 
+## Teams
+
+| Team                        | Focus                                                     | Members                |
+| --------------------------- | --------------------------------------------------------- | ---------------------- |
+| Retrieval Engineering (RAG) | Document retrieval and context pipeline                   | Arham, Noble, Mohammed |
+| Summarization               | Document and report summarization workflows               | Arpita                 |
+| Product Design (UI/UX)      | Frontend usability, interface design, and experience flow | Alysze, Zach           |
+| Compliance & FERPA          | Policy alignment and compliance safeguards                | Jon                    |
+
+---
+
 ## FERPA Notice — Mandatory Read
 
 This system is designed for FERPA-regulated student data. Every contributor must understand and follow these rules:
@@ -142,7 +155,7 @@ FERPA compliance research and the full compliance memo are in the `research-trac
 
 ## Contributing
 
-Read [`COLLABORATION.md`](./COLLABORATION.md) before opening your first PR.  
+Read [`COLLABORATION.md`](./COLLABORATION.md) before opening your first PR.
 
 All PRs require Natoli's review and approval. No direct commits to `main` or `dev`.
 
@@ -150,11 +163,11 @@ All PRs require Natoli's review and approval. No direct commits to `main` or `de
 
 ## Key Contacts
 
-| Question | Contact |
-|---|---|
-| Architecture, scope, tech decisions | Natoli (EL) |
-| Deadlines, meetings, process | Kai (PM) |
-| School psych domain questions | Dr. Josh Johnson |
-| FERPA / compliance questions | Jon T. → Dr. Josh Johnson |
+| Question                            | Contact                   |
+| ----------------------------------- | ------------------------- |
+| Architecture, scope, tech decisions | Natoli (EL)               |
+| Deadlines, meetings, process        | Kai (PM)                  |
+| School psych domain questions       | Dr. Josh Johnson          |
+| FERPA / compliance questions        | Jon T. → Dr. Josh Johnson |
 
 ---

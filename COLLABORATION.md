@@ -33,6 +33,11 @@
 
 ## 📋 Workflow Rules
 
+### 📺 Walkthrough
+
+New to the workflow? Watch the setup and PR demo before diving in:
+[Git Collaboration Walkthrough →](https://loom.com/link)
+
 ```bash
 # Always sync before starting new work:
 git checkout dev
