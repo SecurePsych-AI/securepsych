@@ -12,9 +12,9 @@ Student data never leaves the building. This repository never contains student d
 
 | Phase | Name | Dates | Status |
 |---|---|---|---|
-| 0 | Research Sprint | Feb 24 – Mar 5 | **IN PROGRESS** |
-| 1 | Infrastructure & Scaffold | Mar 6 – Mar 10 | Not started |
-| 2 | Core RAG + Summarization | Mar 11 – Mar 28 | Not started |
+| 0 | Research Sprint | Feb 24 – Mar 5 | **Complete** |
+| 1 | Infrastructure & Scaffold | Mar 6 – Mar 10 | **ON-HOLD** |
+| 2 | Core RAG + Summarization | Mar 11 – Mar 28 | **IN PROGRESS** |
 | 3 | Jargon Simplifier + Data Visualization | Mar 29 – Apr 11 | Not started |
 | 4 | Evaluation Task Manager | Apr 12 – May | Future scope |
 
@@ -40,6 +40,7 @@ securepsych/
 │   └── systemd/          ← Service unit files for FastAPI + Ollama
 ├── docs/
 │   ├── api/              ← API endpoint reference
+│   ├── checklist/        ← Service/feature POC checklist before demo
 │   ├── troubleshooting/  ← Common issues and fixes
 │   └── jumpstart/        ← Onboarding guide for new contributors
 ├── .env.example          ← Copy to .env — never commit your .env
@@ -59,11 +60,11 @@ Five independent Python/FastAPI services run on separate ports behind a single A
 Browser / Frontend (React + Vite)
         │
         ▼
-   API Gateway :8000
+   API Gateway :8000 / Task Manager
         │
    ┌────┴────────────────────────────────┐
    │                                     │
-RAG Q&A     Summarizer    Jargon    Visualizer    Task Manager
+RAG Q&A     Summarizer    Jargon    Visualizer
    │              │
    └──── ChromaDB (shared vector store) ────┘
 
@@ -106,7 +107,7 @@ LangSmith tracing: metadata only (token counts, latency). No document content tr
 **Environment setup:**
 ```bash
 # Clone the repo
-git clone <gitea-server-ip>/securepsych-ai/securepsych.git
+git clone https://github.com/securepsych-ai/securepsych.git
 cd securepsych
 
 # Copy environment template
@@ -141,7 +142,7 @@ FERPA compliance research and the full compliance memo are in the `research-trac
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening your first PR.  
+Read [`COLLABORATION.md`](./COLLABORATION.md) before opening your first PR.  
 
 All PRs require Natoli's review and approval. No direct commits to `main` or `dev`.
 
@@ -153,8 +154,7 @@ All PRs require Natoli's review and approval. No direct commits to `main` or `de
 |---|---|
 | Architecture, scope, tech decisions | Natoli (EL) |
 | Deadlines, meetings, process | Kai (PM) |
-| Server / infra setup | Arpita H. |
 | School psych domain questions | Dr. Josh Johnson |
-| FERPA / compliance questions | Jon T. → Dr. Josh Johnson → district lawyers |
+| FERPA / compliance questions | Jon T. → Dr. Josh Johnson |
 
 ---
