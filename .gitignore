@@ -7,3 +7,7 @@ node_modules/
 dist/
 *.pdf
 *.docx
+
+# Allow some pdfs
+!docs/checklist/RAG_POC_Checklist.pdf
+!docs/checklist/Summarization_POC_Checklist.pdf
