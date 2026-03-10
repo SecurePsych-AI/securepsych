@@ -46,7 +46,6 @@ securepsych/
 ├── .env.example          ← Copy to .env — never commit your .env
 ├── .gitignore
 ├── CONTRIBUTING.md
-├── GIT_QUICKREF.md
 └── README.md             ← You are here
 ```
 
