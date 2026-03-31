@@ -9,6 +9,7 @@ dist/
 *.docx
 
 # Allow some pdfs
+!backend/rag/sample_psycheval.pdf
 !docs/checklist/RAG_POC_Checklist.pdf
 !docs/checklist/Summarization_POC_Checklist.pdf
 !docs/checklist/FERPA_Compliance_POC_Checklist.pdf
