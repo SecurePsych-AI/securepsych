@@ -4,25 +4,34 @@ ingestion.py — SecurePsych RAG
 Ingests a PDF into ChromaDB.
 
 Every chunk gets metadata:
-    parent_id  = "{pagenumber}_{chunk_number}"   e.g. "3_2"
-    page       = page number (int, 1-indexed)
-    source     = original PDF filename
-    chunk_idx  = chunk index within the page (0-indexed)
-    char_start = character offset inside the page text where chunk starts
+    document_id = UUID generated once per ingest call (stable per upload)
+    parent_id   = "{pagenumber}_{chunk_number}"   e.g. "3_2"
+    page        = page number (int, 1-indexed)
+    source      = original PDF filename
+    chunk_idx   = chunk index within the page (0-indexed)
+    char_start  = character offset inside the page text where chunk starts
 
 parent_id uniquely identifies an individual chunk AND lets deep_retrieve_chunks()
 fetch every sibling chunk on the same page by matching the page portion of the id.
+
+document_id is a UUID stamped across all chunks for one upload — used by the
+Summarizer service and the /documents/{document_id}/content endpoint to scope
+retrieval to a single ingested file.
 """
 
 from __future__ import annotations
 
 import io
 import os
-from typing import Optional
 import uuid
+from typing import Optional
+
 import fitz  # PyMuPDF
 import chromadb
 from chromadb.config import Settings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
@@ -30,16 +39,13 @@ from chromadb.config import Settings
 CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma")
 COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
 
-CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "600"))       # characters
-CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "100")) # characters
+CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "600"))        # characters
+CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "100"))  # characters
 
 
 # ---------------------------------------------------------------------------
 # ChromaDB client (lazy singleton)
 # ---------------------------------------------------------------------------
-# NOTE: In ChromaDB >=1.x, chromadb.Client is a factory function, not a class.
-# We use Optional[Any] here to stay compatible across all versions and Python
-# runtimes that don't support X | None on non-class objects.
 _client: Optional[object] = None
 _collection: Optional[object] = None
 
@@ -107,12 +113,13 @@ def ingest_pdf(pdf_path: str) -> dict:
     Returns
     -------
     dict
-        {"status": "ok", "pages": int, "chunks_added": int, "source": str}
+        {"status": "ok", "document_id": str, "pages": int, "chunks_added": int, "source": str}
     """
     if not os.path.isfile(pdf_path):
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
     source_name = os.path.basename(pdf_path)
+    document_id = str(uuid.uuid4())  # one UUID per ingest, shared across all chunks
     collection = _get_collection()
 
     doc = fitz.open(pdf_path)
@@ -146,11 +153,12 @@ def ingest_pdf(pdf_path: str) -> dict:
             ids.append(doc_id)
             documents.append(chunk["text"])
             metadatas.append({
-                "parent_id":  parent_id,
-                "page":       pagenumber,
-                "chunk_idx":  chunk_number,
-                "char_start": chunk["char_start"],
-                "source":     source_name,
+                "document_id": document_id,
+                "parent_id":   parent_id,
+                "page":        pagenumber,
+                "chunk_idx":   chunk_number,
+                "char_start":  chunk["char_start"],
+                "source":      source_name,
             })
             total_chunks += 1
 
@@ -158,7 +166,7 @@ def ingest_pdf(pdf_path: str) -> dict:
     doc.close()
 
     if not ids:
-        return {"status": "empty", "pages": 0, "chunks_added": 0, "source": source_name}
+        return {"status": "empty", "document_id": document_id, "pages": 0, "chunks_added": 0, "source": source_name}
 
     # Upsert in batches of 100 to stay memory-friendly on large PDFs
     batch_size = 100
@@ -170,10 +178,11 @@ def ingest_pdf(pdf_path: str) -> dict:
         )
 
     return {
-        "status": "ok",
-        "pages": num_pages,
+        "status":       "ok",
+        "document_id":  document_id,
+        "pages":        num_pages,
         "chunks_added": total_chunks,
-        "source": source_name,
+        "source":       source_name,
     }
 
 
@@ -189,13 +198,14 @@ def ingest_pdf_bytes(file_bytes: bytes, filename: str) -> dict:
     Returns
     -------
     dict  Same shape as ingest_pdf():
-        {"status": str, "pages": int, "chunks_added": int, "source": str}
+        {"status": str, "document_id": str, "pages": int, "chunks_added": int, "source": str}
     """
     if not file_bytes:
         return {"error": "Empty file bytes received.", "source": filename}
 
-    collection = _get_collection()
     source_name = filename
+    document_id = str(uuid.uuid4())  # one UUID per ingest, shared across all chunks
+    collection = _get_collection()
     total_chunks = 0
 
     ids: list[str] = []
@@ -224,11 +234,12 @@ def ingest_pdf_bytes(file_bytes: bytes, filename: str) -> dict:
             ids.append(doc_id)
             documents.append(chunk["text"])
             metadatas.append({
-                "parent_id":  parent_id,
-                "page":       pagenumber,
-                "chunk_idx":  chunk_number,
-                "char_start": chunk["char_start"],
-                "source":     source_name,
+                "document_id": document_id,
+                "parent_id":   parent_id,
+                "page":        pagenumber,
+                "chunk_idx":   chunk_number,
+                "char_start":  chunk["char_start"],
+                "source":      source_name,
             })
             total_chunks += 1
 
@@ -236,7 +247,7 @@ def ingest_pdf_bytes(file_bytes: bytes, filename: str) -> dict:
     doc.close()
 
     if not ids:
-        return {"status": "empty", "pages": 0, "chunks_added": 0, "source": source_name}
+        return {"status": "empty", "document_id": document_id, "pages": 0, "chunks_added": 0, "source": source_name}
 
     batch_size = 100
     for i in range(0, len(ids), batch_size):
@@ -247,10 +258,11 @@ def ingest_pdf_bytes(file_bytes: bytes, filename: str) -> dict:
         )
 
     return {
-        "status": "ok",
-        "pages": num_pages,
+        "status":       "ok",
+        "document_id":  document_id,
+        "pages":        num_pages,
         "chunks_added": total_chunks,
-        "source": source_name,
+        "source":       source_name,
     }
 
 
