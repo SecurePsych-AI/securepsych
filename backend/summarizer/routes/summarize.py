@@ -1,3 +1,5 @@
+from services.summarizer import run_summarize_chain
+from services.pdf_loader import load_pdf_from_bytes
 import os
 from typing import Optional
 
@@ -5,8 +7,9 @@ import yaml
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from services.pdf_loader import load_pdf_from_bytes
-from services.summarizer import run_summarize_chain
+_MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB — guard against memory-exhaustion DoS
+_ALLOWED_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
+
 
 router = APIRouter()
 
@@ -53,11 +56,18 @@ async def summarize_document(
             detail="document_id lookup is not yet implemented. Upload a PDF directly for now.",
         )
 
-    if not file.filename.lower().endswith(".pdf"):
+    if file.filename is None or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=422, detail="Only PDF files are supported.")
 
-    pdf_bytes = await file.read()
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415, detail="Only PDF files are supported.")
+
+    pdf_bytes = await file.read(_MAX_PDF_BYTES + 1)
+    if len(pdf_bytes) > _MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413, detail="File exceeds the 50 MB size limit.")
 
     docs, page_count = load_pdf_from_bytes(pdf_bytes)
 
