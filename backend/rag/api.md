@@ -28,8 +28,9 @@ Ingest a PDF into ChromaDB. Returns a `document_id` that can be passed to
   "status": "ok",
   "document_id": "32f4419f-93d6-4a3f-a460-6c3e161318a6",
   "source": "student_eval.pdf",
-  "pages": 48,
-  "chunks_added": 312
+  "strategy": "standard",
+  "chunks_added": 312,
+  "avg_chunk_tokens": 487
 }
 ```
 
@@ -137,14 +138,14 @@ Supports two retrieval modes — `fast` (default) and `deep`.
 | `question` | string | Yes | The question to ask |
 | `document_id` | string | No | Scope query to a specific document. Omit to search all. |
 | `mode` | string | No | `"fast"` (default) or `"deep"` — see below |
-| `top_k` | int | No | Number of chunks to retrieve (default: 3) |
+| `top_k` | int | No | Number of seed chunks to retrieve (default: 3) |
 
 **Retrieval modes:**
 
 | Mode | Description |
 |---|---|
-| `fast` | Standard vector similarity search — lower latency |
-| `deep` | Vector search + full page expansion — higher accuracy for complex queries |
+| `fast` | Vector similarity search + keyword reranking — lower latency |
+| `deep` | Vector search + full-page expansion — higher accuracy for complex queries |
 
 **Response:**
 ```json
@@ -159,7 +160,8 @@ Supports two retrieval modes — `fast` (default) and `deep`.
       "parent_id": "3_1",
       "document_id": "32f4419f-93d6-4a3f-a460-6c3e161318a6"
     }
-  ]
+  ],
+  "chunks": []
 }
 ```
 
@@ -175,5 +177,6 @@ Supports two retrieval modes — `fast` (default) and `deep`.
 
 - All endpoints are unauthenticated at the service level — authentication is handled at the gateway.
 - `document_id` is a UUID generated at ingest time and is stable for the lifetime of that document in ChromaDB.
-- The `chunks` field is included in `/query` responses for debugging but can be stripped at the gateway before forwarding to the client.
-- Scanned PDFs (image-only) will return a 422 on upload — this is a known limitation flagged for Phase 3.
+- The `chunks` field in `/query` responses contains the full retrieved chunk dicts used to build the prompt — strip at the gateway before forwarding to the client.
+- Scanned PDFs (image-only) return 422 on upload — known limitation flagged for Phase 3.
+- `GET /documents/{document_id}/content` is intended for internal service-to-service use (RAG → Summarizer). No auth is enforced at the service level.

@@ -1,18 +1,19 @@
 """
-ingestion.py
-============
+ingestion.py — SecurePsych RAG
+
 Two chunking strategies:
 
-  build_token_chunks()      – original sliding-window strategy (standard mode)
+  build_token_chunks()      – sliding-window strategy (standard / fast mode)
   build_page_chunks()       – page-boundary strategy for deep mode
 
 Parent-ID schema (agreed field name: "parent_id")
 --------------------------------------------------
-For every chunk produced by build_page_chunks(), ChromaDB metadata includes:
+For ALL chunks (both strategies), ChromaDB metadata includes:
 
     parent_id: "{page_number}_{chunk_number}"
 
-
+  build_token_chunks → parent_id = "{page_start}_{chunk_index}"
+  build_page_chunks  → parent_id = "{origin_page}_{sub_chunk_number}"
 
 Mohammed: the field is always "parent_id", value always "{N}_{C}" — matching rag_query.py schema.
 
@@ -21,36 +22,56 @@ Benchmark harness
 Run at the bottom of this file (or via CLI):
 
     python ingestion.py --benchmark sample_psycheval.pdf
-
-It ingests the PDF at chunk sizes 512 / 600 / 768 / 800, queries 4 fixed
-questions against each, and prints a side-by-side results table so you can
-pick the best chunk size with evidence rather than a guess.
 """
 
+from __future__ import annotations
+
+import io
+import os
+import re
 import sys
 import uuid
 import argparse
 import textwrap
-import fitz
+from typing import Optional
+
+import fitz  # PyMuPDF
 import chromadb
+from chromadb.config import Settings
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Configuration (override via env vars)
+# ---------------------------------------------------------------------------
+CHROMA_PATH: str     = os.getenv("CHROMA_PATH",      "./chroma")
+COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
+
+CHUNK_SIZE: int    = int(os.getenv("CHUNK_SIZE",    "600"))
+CHUNK_OVERLAP: float = float(os.getenv("CHUNK_OVERLAP", "0.20"))  # 20% overlap (sliding-window only)
 
 
 # ---------------------------------------------------------------------------
-# ChromaDB client — shared across both strategies
+# ChromaDB client — lazy singleton (mirrors rag_query.py and api.py)
 # ---------------------------------------------------------------------------
-
-chroma_client = chromadb.PersistentClient(path="./chroma")
-collection = chroma_client.get_or_create_collection(name="securepsych_docs")
-
-
-# ---------------------------------------------------------------------------
-# Config defaults
-# ---------------------------------------------------------------------------
-
-CHUNK_SIZE = 600   # target tokens per chunk
-OVERLAP    = 0.20  # 20 % overlap (sliding-window strategy only)
+_client: Optional[object] = None
+_collection: Optional[object] = None
 
 
+def _get_collection():
+    """Return (and lazily create) the ChromaDB collection."""
+    global _client, _collection
+    if _collection is None:
+        _client = chromadb.PersistentClient(
+            path=CHROMA_PATH,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        _collection = _client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
+        )
+    return _collection
 
 
 # ---------------------------------------------------------------------------
@@ -62,10 +83,7 @@ def approximate_tokens(text: str) -> int:
     return len(text) // 4
 
 
-import re
-
 # A line must appear on at least this fraction of pages to be treated as boilerplate.
-# 0.4 = present on 40%+ of pages. Lower catches more noise; higher is more conservative.
 BOILERPLATE_THRESHOLD = 0.4
 
 # Lines shorter than this (in characters) are never flagged as boilerplate —
@@ -91,8 +109,7 @@ def detect_boilerplate(raw_pages: list[str]) -> set[str]:
     line_page_count: dict[str, int] = {}
 
     for page_text in raw_pages:
-        # Use a set so a line appearing twice on the same page only counts once
-        seen_on_page = set()
+        seen_on_page: set[str] = set()
         for line in page_text.splitlines():
             normalised = line.strip()
             if len(normalised) >= BOILERPLATE_MIN_LENGTH and normalised not in seen_on_page:
@@ -120,7 +137,7 @@ def extract_pages(file_bytes: bytes) -> list[dict]:
     2. Detect boilerplate lines that repeat across pages.
     3. Strip those lines and return clean page texts.
     """
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    doc = fitz.open(stream=io.BytesIO(file_bytes), filetype="pdf")
 
     # Pass 1: collect raw text
     raw = []
@@ -143,25 +160,23 @@ def extract_pages(file_bytes: bytes) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Strategy 1 — sliding token window (standard mode, unchanged)
+# Strategy 1 — sliding token window (standard mode)
 # ---------------------------------------------------------------------------
 
 def build_token_chunks(
     pages: list[dict],
     chunk_size: int = CHUNK_SIZE,
-    overlap: float = OVERLAP,
+    overlap: float = CHUNK_OVERLAP,
 ) -> list[dict]:
     """
     Split the full document text into overlapping token-sized chunks.
 
-    Strategy:
-    - Concatenate all page text, tracking which characters belong to which page.
-    - Split into words (proxy for tokens at ~0.75 words/token).
-    - Slide a window of `chunk_size` tokens forward by `chunk_size * (1 - overlap)` each step.
-    - Record the page range covered by each chunk for citation metadata.
+    Each chunk gets a parent_id of "{page_start}_{chunk_index}" so that
+    rag_query.py's deep_retrieve_chunks() can extract the page number via
+    _page_from_parent_id() without special-casing this strategy.
     """
-    word_list  = []
-    word_pages = []
+    word_list:  list[str] = []
+    word_pages: list[int] = []
 
     for page in pages:
         words = page["text"].split()
@@ -174,9 +189,9 @@ def build_token_chunks(
     words_per_chunk = max(1, int(chunk_size * 0.75))
     step            = max(1, int(words_per_chunk * (1 - overlap)))
 
-    chunks      = []
-    chunk_index = 0
-    start       = 0
+    chunks:      list[dict] = []
+    chunk_index: int        = 0
+    start:       int        = 0
 
     while start < len(word_list):
         end         = min(start + words_per_chunk, len(word_list))
@@ -188,10 +203,12 @@ def build_token_chunks(
         page_end      = pages_covered[-1]
 
         chunks.append({
-            "chunk_index":   chunk_index,
-            "text":          chunk_text,
-            "page_start":    page_start,
-            "page_end":      page_end,
+            "chunk_index":    chunk_index,
+            "text":           chunk_text,
+            "page_start":     page_start,
+            "page_end":       page_end,
+            # FIX: parent_id added here so rag_query.py can always rely on it
+            "parent_id":      f"{page_start}_{chunk_index}",
             "token_estimate": approximate_tokens(chunk_text),
         })
 
@@ -200,9 +217,9 @@ def build_token_chunks(
 
         remaining = len(word_list) - start
         if 0 < remaining < int(words_per_chunk * 0.10):
-            last            = chunks[-1]
-            extra_words     = word_list[start:]
-            last["text"]   += " " + " ".join(extra_words)
+            last             = chunks[-1]
+            extra_words      = word_list[start:]
+            last["text"]    += " " + " ".join(extra_words)
             last["page_end"] = word_pages[-1]
             last["token_estimate"] = approximate_tokens(last["text"])
             break
@@ -228,51 +245,39 @@ def build_page_chunks(
     2.  Slice the combined word list into full chunks of `chunk_size` tokens.
         Each full chunk is labeled with the ORIGIN page (the page whose words
         started the overflow), not the current page.
-        e.g. page 3 fills chunk page_3_1, has 200 tokens left →
-             those 200 tokens are prepended to page 4's words →
-             the resulting full chunk is labeled page_3_2.
     3.  Whatever remains after the last full chunk on a page becomes the
         overflow buffer, carrying its origin page label into the next page.
     4.  After all pages are processed, any remaining overflow is emitted as a
         final partial chunk under its origin page label.
 
-    parent_id format (agreed with Mohammed): "page_{page_number}_{chunk_number}"
-    - page_number  : 1-indexed PDF page of the overflow origin (not physical page)
-    - chunk_number : 1-indexed, resets to 1 whenever a new page's content starts
-                     (i.e. whenever the overflow buffer was empty going into a page)
+    parent_id format: "{origin_page}_{sub_chunk_number}"
     Examples across a 3-page doc:
         1_1            ← first full chunk from page 1
         1_2            ← overflow from page 1 + start of page 2, labeled page 1
         2_1            ← remainder of page 2 after overflow chunk, fresh start
         3_1            ← page 3 fits in one chunk
     """
-    chunks          = []
-    chunk_index     = 0
-    words_per_chunk = max(1, int(chunk_size * 0.75))
+    chunks:          list[dict] = []
+    chunk_index:     int        = 0
+    words_per_chunk: int        = max(1, int(chunk_size * 0.75))
 
-    # Carry-forward state
-    overflow_words    : list[str] = []   # leftover words from previous page
-    overflow_origin   : int       = 0    # page number those words came from
-    overflow_sub_num  : int       = 1    # next sub-chunk number for that origin page
+    overflow_words:   list[str] = []
+    overflow_origin:  int       = 0
+    overflow_sub_num: int       = 1
 
     for page in pages:
-        page_num    = page["page"]
-        page_words  = page["text"].split()
+        page_num   = page["page"]
+        page_words = page["text"].split()
 
-        # Decide origin label for chunks produced during this page
         if overflow_words:
-            # We're continuing from a previous page's overflow
             origin_page = overflow_origin
             sub_num     = overflow_sub_num
         else:
-            # Fresh start — this page owns its own chunks
             origin_page = page_num
             sub_num     = 1
 
-        # Combine overflow + this page's words
         combined = overflow_words + page_words
 
-        # Emit as many full chunks as possible
         start = 0
         while start + words_per_chunk <= len(combined):
             end        = start + words_per_chunk
@@ -291,12 +296,10 @@ def build_page_chunks(
             sub_num     += 1
             start        = end
 
-        # Whatever is left becomes the new overflow, still attributed to origin_page
         overflow_words   = combined[start:]
         overflow_origin  = origin_page
         overflow_sub_num = sub_num
 
-        # If we fully consumed the combined buffer (no overflow), next page is fresh
         if not overflow_words:
             overflow_origin  = 0
             overflow_sub_num = 1
@@ -328,34 +331,43 @@ def _store_chunks(
     strategy:    str,
 ) -> dict:
     """Write chunks to ChromaDB and return a summary dict."""
-    ids       = []
-    documents = []
-    metadatas = []
+    collection = _get_collection()
+
+    ids:       list[str]  = []
+    documents: list[str]  = []
+    metadatas: list[dict] = []
 
     for chunk in chunks:
-        ids.append(f"{document_id}_chunk{chunk['chunk_index']}")
+        # ID format matches the rest of the codebase: "{source}::{parent_id}"
+        ids.append(f"{filename}::{chunk['parent_id']}")
         documents.append(chunk["text"])
-        meta = {
+        metadatas.append({
             "document_id":    document_id,
+            "parent_id":      chunk["parent_id"],
             "source":         filename,
             "chunk_idx":      chunk["chunk_index"],
             "page":           chunk["page_start"],
             "page_end":       chunk["page_end"],
             "token_estimate": chunk["token_estimate"],
             "strategy":       strategy,
-        }
-        if "parent_id" in chunk:
-            meta["parent_id"] = chunk["parent_id"]
-        metadatas.append(meta)
+        })
 
-    collection.add(ids=ids, documents=documents, metadatas=metadatas)
+    # FIX: upsert (not add) so re-ingesting the same PDF is safe / idempotent
+    batch_size = 100
+    for i in range(0, len(ids), batch_size):
+        collection.upsert(
+            ids=ids[i : i + batch_size],
+            documents=documents[i : i + batch_size],
+            metadatas=metadatas[i : i + batch_size],
+        )
 
     avg_tokens = sum(c["token_estimate"] for c in chunks) // len(chunks)
     return {
-        "document_id":    document_id,
-        "filename":       filename,
-        "strategy":       strategy,
-        "chunks_stored":  len(chunks),
+        "status":           "ok",
+        "document_id":      document_id,
+        "source":           filename,
+        "strategy":         strategy,
+        "chunks_added":     len(chunks),
         "avg_chunk_tokens": avg_tokens,
     }
 
@@ -367,14 +379,25 @@ def ingest_pdf_bytes(
     chunk_size: int = CHUNK_SIZE,
 ) -> dict:
     """
-    Ingest a PDF from raw bytes.
-    strategy: "standard"  → sliding token window (build_token_chunks)
-              "deep"      → page-boundary chunks  (build_page_chunks)
-    Returns a summary dict for the FastAPI response.
+    Ingest a PDF from raw bytes (used by the FastAPI upload endpoint).
+
+    Parameters
+    ----------
+    file_bytes : Raw bytes of the PDF file.
+    filename   : Original filename, used as the ``source`` metadata field.
+    strategy   : "standard" → sliding token window | "deep" → page-boundary chunks
+    chunk_size : Target tokens per chunk.
+
+    Returns
+    -------
+    dict  {"status", "document_id", "source", "strategy", "chunks_added", "avg_chunk_tokens"}
     """
+    if not file_bytes:
+        return {"error": "Empty file bytes received.", "source": filename}
+
     pages = extract_pages(file_bytes)
     if not pages:
-        return {"error": f"No extractable text found in {filename}"}
+        return {"error": f"No extractable text found in {filename}", "source": filename}
 
     if strategy == "deep":
         chunks = build_page_chunks(pages, chunk_size=chunk_size)
@@ -382,7 +405,7 @@ def ingest_pdf_bytes(
         chunks = build_token_chunks(pages, chunk_size=chunk_size)
 
     if not chunks:
-        return {"error": f"Could not produce any chunks from {filename}"}
+        return {"error": f"Could not produce any chunks from {filename}", "source": filename}
 
     document_id = str(uuid.uuid4())
     return _store_chunks(chunks, filename, document_id, strategy)
@@ -393,15 +416,30 @@ def ingest_pdf(
     strategy:   str = "standard",
     chunk_size: int = CHUNK_SIZE,
 ) -> dict:
-    """Ingest a PDF from a file path (CLI / benchmark use)."""
+    """
+    Ingest a PDF from a file path.
+
+    Parameters
+    ----------
+    filepath  : Absolute or relative path to the PDF file.
+    strategy  : "standard" → sliding token window | "deep" → page-boundary chunks
+    chunk_size: Target tokens per chunk.
+
+    Returns
+    -------
+    dict  Same shape as ingest_pdf_bytes().
+    """
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"PDF not found: {filepath}")
+
     with open(filepath, "rb") as f:
         file_bytes = f.read()
-    filename = filepath.split("/")[-1]
+
+    filename = os.path.basename(filepath)
     pages    = extract_pages(file_bytes)
 
     if not pages:
-        print(f"No extractable text found in {filename}")
-        return {}
+        return {"error": f"No extractable text found in {filename}", "source": filename}
 
     if strategy == "deep":
         chunks = build_page_chunks(pages, chunk_size=chunk_size)
@@ -409,22 +447,41 @@ def ingest_pdf(
         chunks = build_token_chunks(pages, chunk_size=chunk_size)
 
     if not chunks:
-        print(f"Could not produce any chunks from {filename}")
-        return {}
+        return {"error": f"Could not produce any chunks from {filename}", "source": filename}
 
     document_id = str(uuid.uuid4())
     summary     = _store_chunks(chunks, filename, document_id, strategy)
 
     print(f"\nIngestion successful!")
-    print(f"  File:            {summary['filename']}")
+    print(f"  File:            {summary['source']}")
     print(f"  Strategy:        {summary['strategy']}")
     print(f"  Document ID:     {summary['document_id']}")
-    print(f"  Chunks stored:   {summary['chunks_stored']}")
+    print(f"  Chunks stored:   {summary['chunks_added']}")
     print(f"  Avg chunk size:  ~{summary['avg_chunk_tokens']} tokens")
-    print(f"  Chunk size cfg:  {chunk_size} tokens" +
-          (f"  |  Overlap: {int(OVERLAP * 100)}%" if strategy == "standard" else "  |  Overlap: none (deep mode)"))
 
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Utility functions (used by api.py and test_top_k.py)
+# ---------------------------------------------------------------------------
+
+def list_sources() -> list[str]:
+    """Return unique source filenames that have been ingested."""
+    collection = _get_collection()
+    results    = collection.get(include=["metadatas"])
+    sources    = {m["source"] for m in results["metadatas"] if m}
+    return sorted(sources)
+
+
+def delete_source(source_name: str) -> int:
+    """Remove all chunks belonging to *source_name*. Returns number of deleted chunks."""
+    collection     = _get_collection()
+    results        = collection.get(include=["metadatas"], where={"source": source_name})
+    ids_to_delete  = results["ids"]
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+    return len(ids_to_delete)
 
 
 # ---------------------------------------------------------------------------
@@ -446,35 +503,27 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
     Ingest `filepath` four times (once per chunk size) and query each
     ingestion with BENCHMARK_QUESTIONS.  Prints a formatted comparison table.
 
-    Scoring heuristic
-    -----------------
-    For each (question, chunk_size) pair we record:
-      - how many result chunks were returned
-      - the average character length of those chunks (longer → more context)
-    These are rough proxies for "completeness" — a human should still read the
-    snippets and confirm.  The heuristic is printed alongside the snippets so
-    the final decision is yours.
+    Uses an ephemeral ChromaDB client so benchmark runs don't pollute
+    the production chroma store.
     """
     print("\n" + "=" * 72)
     print("CHUNK SIZE BENCHMARK")
     print(f"File: {filepath}")
     print("=" * 72)
 
-    # We use a throw-away ephemeral client so benchmark runs don't pollute
-    # the production chroma_db.
     bench_client     = chromadb.EphemeralClient()
     bench_collection = bench_client.get_or_create_collection(name="securepsych_docs_benchmark")
 
     with open(filepath, "rb") as f:
         file_bytes = f.read()
-    filename = filepath.split("/")[-1]
+
+    filename = os.path.basename(filepath)
     pages    = extract_pages(file_bytes)
 
     if not pages:
         print("ERROR: No extractable text found — aborting benchmark.")
         return
 
-    # Map chunk_size → document_id so we can filter queries per run
     run_ids: dict[int, str] = {}
 
     for cs in CHUNK_SIZES_TO_TEST:
@@ -483,9 +532,9 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
         run_ids[cs] = document_id
 
         bench_collection.add(
-            ids       =[f"{document_id}_chunk{c['chunk_index']}" for c in chunks],
-            documents =[c["text"] for c in chunks],
-            metadatas =[
+            ids=[f"{document_id}_chunk{c['chunk_index']}" for c in chunks],
+            documents=[c["text"] for c in chunks],
+            metadatas=[
                 {
                     "document_id":    document_id,
                     "chunk_size_cfg": cs,
@@ -498,7 +547,6 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
         )
         print(f"\n  Ingested with chunk_size={cs}: {len(chunks)} chunks stored")
 
-    # --- Query loop ----------------------------------------------------------
     scores: dict[int, list[float]] = {cs: [] for cs in CHUNK_SIZES_TO_TEST}
 
     for q_idx, question in enumerate(BENCHMARK_QUESTIONS, start=1):
@@ -512,8 +560,7 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
                 n_results=n_results,
                 where={"document_id": run_ids[cs]},
             )
-            docs = results["documents"][0]  # list of chunk texts
-
+            docs    = results["documents"][0]
             avg_len = sum(len(d) for d in docs) / max(len(docs), 1)
             scores[cs].append(avg_len)
 
@@ -522,7 +569,6 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
                 snippet = textwrap.shorten(doc, width=160, placeholder=" …")
                 print(f"    [{i}] {snippet}")
 
-    # --- Summary table -------------------------------------------------------
     print(f"\n{'=' * 72}")
     print("SUMMARY — average chunk length across all questions (higher = more context per result)")
     print(f"{'─' * 40}")
@@ -563,10 +609,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.filepath:
-        if args.benchmark:
-            args.filepath = input("Enter the path to your PDF for benchmarking: ").strip()
-        else:
-            args.filepath = input("Enter the path to your PDF: ").strip()
+        prompt_msg = "Enter the path to your PDF for benchmarking: " if args.benchmark else "Enter the path to your PDF: "
+        args.filepath = input(prompt_msg).strip()
 
     if args.benchmark:
         run_benchmark(args.filepath)
