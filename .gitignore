@@ -8,6 +8,7 @@ dist/
 *.pdf
 *.docx
 .claude*
+*-local*
 
 # Allow some pdfs
 !docs/checklist/RAG_POC_Checklist.pdf
