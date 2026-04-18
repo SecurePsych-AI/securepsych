@@ -120,15 +120,15 @@ curl -X POST http://localhost:8002/summarize \
 
 ## Configuration (`config.yaml`)
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `summarizer.enabled` | `true` | Feature flag — set to `false` to return 503 from gateway |
-| `summarizer.model` | `llama3.2` | Ollama model name — update after Phase 1 benchmarking |
-| `summarizer.ollama_base_url` | `http://localhost:11434` | Local Ollama instance URL |
-| `summarizer.chunk_size` | `2000` | Characters per text chunk — revisit after RAG team Research findings |
-| `summarizer.chunk_overlap` | `200` | Overlap between chunks |
-| `summarizer.encrypted_storage_path` | `/mnt/securepsych/data` | LUKS-encrypted mount — all disk writes go here |
-| `summarizer.temp_dir` | `/tmp/securepsych/summarizer` | Temp file location (if disk buffering is needed) |
+| Key                                 | Default                       | Description                                                          |
+| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------- |
+| `summarizer.enabled`                | `true`                        | Feature flag — set to `false` to return 503 from gateway             |
+| `summarizer.model`                  | `llama3.2`                    | Ollama model name — update after Phase 1 benchmarking                |
+| `summarizer.ollama_base_url`        | `http://localhost:11434`      | Local Ollama instance URL                                            |
+| `summarizer.chunk_size`             | `2000`                        | Characters per text chunk — revisit after RAG team Research findings |
+| `summarizer.chunk_overlap`          | `200`                         | Overlap between chunks                                               |
+| `summarizer.encrypted_storage_path` | `/mnt/securepsych/data`       | LUKS-encrypted mount — all disk writes go here                       |
+| `summarizer.temp_dir`               | `/tmp/securepsych/summarizer` | Temp file location (if disk buffering is needed)                     |
 
 ---
 
@@ -139,35 +139,36 @@ curl -X POST http://localhost:8002/summarize \
 Returns 200 if the service is up.
 
 ```json
-{"status": "ok", "service": "summarizer"}
+{ "status": "ok", "service": "summarizer" }
 ```
 
 ### `POST /summarize`
 
 **Form fields:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `file` | PDF file upload | One of `file` or `document_id` | The evaluation PDF to summarize |
-| `document_id` | string | One of `file` or `document_id` | Document ID from prior RAG ingestion (stubbed — use `file` for now) |
+| Field  | Type            | Required | Description                     |
+| ------ | --------------- | -------- | ------------------------------- |
+| `file` | PDF file upload | Yes      | The evaluation PDF to summarize |
+
+> If summarizing a document already ingested into RAG, the API gateway is responsible for fetching its bytes and forwarding them here as a file upload. This service does not accept a `document_id` directly.
 
 **Response:**
 
 ```json
 {
   "summary": "...",
-  "method": "refine",
   "page_count": 48
 }
 ```
 
 **Error codes:**
 
-| Code | Meaning |
-|------|---------|
-| 422 | No input provided, or non-PDF file uploaded |
-| 501 | `document_id` path not yet implemented |
-| 503 | Feature disabled via `config.yaml` |
+| Code | Meaning                                                                              |
+| ---- | ------------------------------------------------------------------------------------ |
+| 413  | PDF exceeds 50 MB size limit                                                         |
+| 415  | Unsupported `Content-Type` (must be `application/pdf` or `application/octet-stream`) |
+| 422  | Missing file or non-PDF filename                                                     |
+| 503  | Feature disabled via `config.yaml`                                                   |
 
 ---
 
@@ -199,17 +200,17 @@ Tests do not require Ollama or a real PDF — they verify the app boots and endp
 - [ ] Get at least one sample summary reviewed by Dr. Josh Johnson (checklist item 6)
 - [ ] Spot-check 2–3 cross-page references in the test document (checklist item 8)
 - [ ] Verify LangSmith dashboard shows only metadata — no document content (checklist item 11)
-- [ ] Implement `document_id` lookup once RAG ingestion store is ready (coordinate with Arham / Noble / Mohammed)
+- [ ] Coordinate `document_id` → bytes lookup contract with Arham / Noble / Mohammed so the gateway can fetch and forward document content to this endpoint
 - [ ] Fill in `/health` gateway routing once gateway service is scaffolded
 
 ---
 
 ## Key Contacts
 
-| Question | Contact |
-|----------|---------|
-| Architecture / scope decisions | Natoli (EL) |
-| Deadlines / process | Kai (PM) |
-| Psych eval domain / summary quality | Dr. Josh Johnson |
-| FERPA / compliance | Jon T. → Dr. Josh Johnson |
-| RAG ingestion store / document_id contract | Arham / Noble / Mohammed |
+| Question                                   | Contact                   |
+| ------------------------------------------ | ------------------------- |
+| Architecture / scope decisions             | Natoli (EL)               |
+| Deadlines / process                        | Kai (PM)                  |
+| Psych eval domain / summary quality        | Dr. Josh Johnson          |
+| FERPA / compliance                         | Jon T. → Dr. Josh Johnson |
+| RAG ingestion store / document_id contract | Arham / Noble / Mohammed  |
