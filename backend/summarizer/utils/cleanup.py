@@ -11,6 +11,16 @@ import os
 import tempfile
 from contextlib import asynccontextmanager
 
+import yaml
+
+
+def _get_encrypted_temp_dir() -> str:
+    """Return the LUKS-encrypted storage path from config."""
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+    return cfg.get("summarizer", {}).get("encrypted_storage_path", "/tmp")
+
 
 @asynccontextmanager
 async def temp_file_context(suffix: str = "", prefix: str = "securepsych_sum_"):
@@ -27,7 +37,9 @@ async def temp_file_context(suffix: str = "", prefix: str = "securepsych_sum_"):
     """
     tmp_path = None
     try:
-        fd, tmp_path = tempfile.mkstemp(suffix=suffix, prefix=prefix)
+        enc_dir = _get_encrypted_temp_dir()
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=suffix, prefix=prefix, dir=enc_dir)
         os.close(fd)
         yield tmp_path
     finally:

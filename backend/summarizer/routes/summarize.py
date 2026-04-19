@@ -1,3 +1,5 @@
+from services.summarizer import run_summarize_chain
+from services.pdf_loader import load_pdf_from_bytes
 import os
 from typing import Optional
 
@@ -5,8 +7,9 @@ import yaml
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from services.pdf_loader import load_pdf_from_bytes
-from services.summarizer import run_summarize_chain
+_MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB — guard against memory-exhaustion DoS
+_ALLOWED_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
+
 
 router = APIRouter()
 
@@ -19,45 +22,35 @@ def _feature_enabled() -> bool:
 
 class SummaryResponse(BaseModel):
     summary: str
-    method: str
     page_count: int
 
 
 @router.post("/summarize", response_model=SummaryResponse)
 async def summarize_document(
     file: Optional[UploadFile] = File(None),
-    document_id: Optional[str] = Form(None),
 ):
     """
-    Accept a PDF upload (or a document_id from a prior RAG ingestion) and
-    return a structured summary covering diagnoses, test scores,
-    accommodations, and evaluation dates.
+    Summarize a PDF document.
 
-    Stateless — no session state is retained between calls.
+    Accepts raw PDF bytes only. This service is intentionally stateless.
+    If summarizing a document already ingested into RAG, the API gateway
+    is responsible for fetching its content and forwarding it here.
     """
     if not _feature_enabled():
         raise HTTPException(status_code=503, detail="Feature unavailable")
 
-    if file is None and document_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide either a PDF file or a document_id.",
-        )
-
-    if document_id is not None:
-        # TODO: retrieve document bytes from the RAG ingestion store once that
-        # service is live (Arham / Noble / Mohammed — coordinate on the shared
-        # document ID contract).
-        raise HTTPException(
-            status_code=501,
-            detail="document_id lookup is not yet implemented. Upload a PDF directly for now.",
-        )
-
-    if not file.filename.lower().endswith(".pdf"):
+    if file.filename is None or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=422, detail="Only PDF files are supported.")
 
-    pdf_bytes = await file.read()
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415, detail="Only PDF files are supported.")
+
+    pdf_bytes = await file.read(_MAX_PDF_BYTES + 1)
+    if len(pdf_bytes) > _MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413, detail=f"PDF exceeds maximum allowed size of {_MAX_PDF_BYTES} bytes.")
 
     docs, page_count = load_pdf_from_bytes(pdf_bytes)
 
@@ -71,6 +64,5 @@ async def summarize_document(
 
     return SummaryResponse(
         summary=summary_text,
-        method="refine",
         page_count=page_count,
     )

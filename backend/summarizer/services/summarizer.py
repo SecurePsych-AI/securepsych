@@ -11,7 +11,8 @@ Why Refine?
   Decision documented per Summarization_POC_Checklist item 2 (Research 3).
 
 LangSmith tracing is enabled automatically via LANGCHAIN_TRACING_V2 env var.
-Only token counts and latency metadata are transmitted — zero document content.
+Document content is blocked from LangSmith by the LANGCHAIN_HIDE_INPUTS/OUTPUTS
+guards set unconditionally in main.py. Do not remove those guards.
 """
 
 import logging

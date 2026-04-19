@@ -1,9 +1,18 @@
+from fastapi import FastAPI
+import yaml
 from routes import health, summarize
 import logging
 import os
 
-import yaml
-from fastapi import FastAPI
+# ── Security: enforce LangSmith data-scrubbing before any LangChain import ────
+# LANGCHAIN_HIDE_INPUTS/OUTPUTS stop LangSmith from capturing prompt payloads
+# (which contain full document text). These are set unconditionally in code so
+# they cannot be accidentally omitted from .env, preventing a FERPA violation.
+# Tracing itself (LANGCHAIN_TRACING_V2) is still controlled via .env.
+os.environ["LANGCHAIN_HIDE_INPUTS"] = "true"
+os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 logging.basicConfig(
     level=logging.INFO,
