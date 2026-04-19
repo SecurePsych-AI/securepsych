@@ -65,8 +65,8 @@ Copy `.env.example` to `.env` and fill in your values. Never commit `.env`.
 |---|---|---|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Base URL for the local Ollama instance |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct` | Model name — update after benchmarking |
-| `CHROMA_PATH` | `./chroma` | Path to the ChromaDB persistent store — must match across all three service files |
-| `CHROMA_COLLECTION` | `securepsych_docs` | ChromaDB collection name — must match across all three service files |
+| `CHROMA_PATH` | `./chroma` | Path to the ChromaDB persistent store — RAG-internal only, not accessed by other services |
+| `CHROMA_COLLECTION` | `securepsych_docs` | ChromaDB collection name — RAG-internal only, not shared with other services |
 | `CHUNK_SIZE` | `600` | Target tokens per chunk — validated range 512–800 per Research 1 & 2 |
 | `CHUNK_OVERLAP` | `0.20` | Overlap fraction for sliding-window chunking (20%) |
 
@@ -175,7 +175,7 @@ curl -X DELETE http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e16131
 
 ### `GET /documents/{document_id}/content`
 
-Retrieve the full reconstructed text of an ingested document. Used internally by the Summarizer service — Arpita calls this instead of re-uploading an already-ingested PDF.
+Retrieve the full reconstructed text of an ingested document. Used by the API gateway when orchestrating summarization of a previously-ingested PDF — the gateway fetches content here and forwards it to the Summarizer. No other service calls this endpoint directly.
 
 **Example:**
 ```bash
@@ -192,7 +192,7 @@ curl http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/conten
 }
 ```
 
-> **Note:** Reconstructed text contains some repeated content at chunk boundaries (due to 20% overlap). The Summarizer's `pdf_loader` re-chunks anyway, so this is fine for the POC.
+> **Note:** Reconstructed text contains some repeated content at chunk boundaries (due to 20% overlap). The gateway consumer is expected to forward these bytes as-is; downstream re-chunking handles the overlap.
 
 **Error codes:**
 
@@ -337,7 +337,7 @@ Both modes use `_prioritize_chunks_for_question()` to front-load the most releva
 
 - **Embedding quality misses:** certain query types (diagnoses, drug allergies phrased as adverse reactions) fail to retrieve the correct chunk at any `top_k`. This is an embedding model limitation, not a retrieval parameter issue. Documented in `rag_query.py`. Deep mode partially compensates via page expansion.
 - **Scanned PDFs:** image-only PDFs return 422 on upload — no extractable text. Flagged for Phase 3.
-- **Reconstructed text overlap:** `/content` endpoint output contains duplicate text at chunk boundaries. Acceptable for the POC; the Summarizer re-chunks anyway.
+- **Reconstructed text overlap:** `/content` endpoint output contains duplicate text at chunk boundaries. Acceptable for the POC; the gateway consumer forwards bytes as-is and downstream re-chunking handles overlap.
 
 ---
 

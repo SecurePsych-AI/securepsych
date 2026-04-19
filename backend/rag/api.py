@@ -7,7 +7,7 @@ Endpoints:
     POST   /upload                          — ingest a PDF into ChromaDB
     GET    /documents                       — list all ingested documents
     DELETE /documents/{document_id}         — remove a document and all its chunks
-    GET    /documents/{document_id}/content — retrieve full document text (used by Summarizer)
+    GET    /documents/{document_id}/content — retrieve full document text (used by API gateway)
     POST   /query                           — RAG Q&A endpoint
 """
 
@@ -167,11 +167,10 @@ def delete_document(document_id: str):
 # ---------------------------------------------------------------------------
 # GET /documents/{document_id}/content
 # Retrieve the full reconstructed text of a document from ChromaDB.
-# Used internally by the Summarizer service — coordinate contract with Arpita.
-#
-# NOTE: Chunks are stored with 20% overlap so the reconstructed text will
-# contain some repeated content at chunk boundaries. The Summarizer's
-# pdf_loader re-chunks the text anyway, so this is fine for the POC.
+# Used by the API gateway when orchestrating summarization of a previously-ingested
+# document — the gateway fetches content here and forwards it to the Summarizer.
+# NOTE: Chunks contain some repeated content at chunk boundaries (20% overlap).
+# The gateway consumer forwards bytes as-is; downstream re-chunking handles the overlap.
 #
 # Usage:
 #   curl http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content

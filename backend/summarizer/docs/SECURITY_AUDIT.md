@@ -210,7 +210,7 @@ guards set unconditionally in main.py. Do not remove those guards.
 
 | Item                                           | Status             | Notes                                                                                                                                                 |
 | ---------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `document_id` lookup path                      | Not implemented    | Returns HTTP 501. Will require its own security review when the RAG service is integrated.                                                            |
+| `document_id` orchestration                    | Gateway responsibility | The Summarizer accepts raw PDF bytes only. When summarizing an already-ingested document, the API gateway fetches its bytes from RAG and forwards them here. This service has no knowledge of `document_id`. No code change needed in this service.  |
 | Authentication / authorisation on `/summarize` | Not implemented    | Service is assumed to sit behind an authenticated gateway (see `backend/gateway`). Direct exposure of this service without a gateway is a FERPA risk. |
 | TLS on Ollama (`http://localhost`)             | Accepted           | Loopback-only; no network-level exposure. Acceptable for local deployment.                                                                            |
 | Rate limiting                                  | Not implemented    | Recommend adding per-IP rate limiting at the gateway layer before production.                                                                         |
