@@ -1,0 +1,19 @@
+features:
+  rag_enabled: true
+  summarizer_enabled: true
+  jargon_enabled: false
+  visualizer_enabled: false
+  tasks_enabled: false
+
+auth:
+  backend: "local_jwt"
+
+services:
+  rag_url: "http://localhost:8001"
+  summarizer_url: "http://localhost:8002"
+  jargon_url: "http://localhost:8003"
+  visualizer_url: "http://localhost:8004"
+  tasks_url: "http://localhost:8005"
+
+storage:
+  log_dir: "/mnt/securepsych/data/gateway"
