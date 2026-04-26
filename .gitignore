@@ -9,6 +9,9 @@ dist/
 *.docx
 .claude*
 *-local*
+.venv/
+.pytest_cache/
+pytest.ini
 
 # Allow some pdfs
 !docs/checklist/RAG_POC_Checklist.pdf

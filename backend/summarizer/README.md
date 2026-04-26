@@ -2,7 +2,7 @@
 
 **Owner:** Arpita Haque
 **Phase:** 2 — Core RAG + Summarization (Mar 11 – Mar 28)
-**Port:** runs behind the API gateway on port 8000
+**Port:** runs behind the API gateway on port 8002
 **Checklist:** `docs/checklist/Summarization_POC_Checklist.pdf`
 
 ---
@@ -80,6 +80,10 @@ summarizer/
 
 ```bash
 cd backend/summarizer
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # (On Windows use: venv\Scripts\activate)
 
 # Using pip
 pip install -r requirements.txt

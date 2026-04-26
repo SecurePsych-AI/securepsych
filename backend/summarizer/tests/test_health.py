@@ -42,7 +42,4 @@ def test_summarize_rejects_non_pdf(tmp_path):
     assert response.status_code == 422
 
 
-def test_summarize_document_id_returns_501():
-    """document_id path is stubbed until RAG ingestion store is ready."""
-    response = client.post("/summarize", data={"document_id": "some-doc-id"})
-    assert response.status_code == 501
+

@@ -39,6 +39,11 @@ async def summarize_document(
     if not _feature_enabled():
         raise HTTPException(status_code=503, detail="Feature unavailable")
 
+    if file is None:
+        raise HTTPException(
+            status_code=422, detail="A PDF file upload is required."
+        )
+
     if file.filename is None or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=422, detail="Only PDF files are supported.")

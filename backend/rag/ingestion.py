@@ -33,10 +33,11 @@ import sys
 import uuid
 import argparse
 import textwrap
+import asyncio
 from typing import Optional
 
-import fitz  # PyMuPDF
 import chromadb
+from backend.shared.extraction import extract_pdf
 from chromadb.config import Settings
 from dotenv import load_dotenv
 
@@ -128,22 +129,17 @@ def strip_boilerplate(text: str, boilerplate: set[str]) -> str:
     return cleaned.strip()
 
 
-def extract_pages(file_bytes: bytes) -> list[dict]:
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+def extract_pages(file_bytes: bytes, filename: str) -> list[dict]:
     """
     Extract text from each PDF page with automatic boilerplate removal.
-
-    Two-pass process:
-    1. Extract raw text from all pages.
-    2. Detect boilerplate lines that repeat across pages.
-    3. Strip those lines and return clean page texts.
+    Uses shared extract_pdf which falls back to Ollama vision.
     """
-    doc = fitz.open(stream=io.BytesIO(file_bytes), filetype="pdf")
+    extraction_result = asyncio.run(extract_pdf(file_bytes, filename, OLLAMA_URL))
 
     # Pass 1: collect raw text
-    raw = []
-    for page in doc:
-        raw.append(page.get_text("text").strip())
-    doc.close()
+    raw = [page.text for page in extraction_result.pages]
 
     # Pass 2: detect and strip boilerplate
     boilerplate = detect_boilerplate(raw)
@@ -151,10 +147,10 @@ def extract_pages(file_bytes: bytes) -> list[dict]:
         print(f"  Auto-detected {len(boilerplate)} boilerplate line(s) — stripping before chunking.")
 
     pages = []
-    for page_num, text in enumerate(raw, start=1):
-        cleaned = strip_boilerplate(text, boilerplate)
+    for page_obj in extraction_result.pages:
+        cleaned = strip_boilerplate(page_obj.text, boilerplate)
         if cleaned:
-            pages.append({"page": page_num, "text": cleaned})
+            pages.append({"page": page_obj.page_num, "text": cleaned})
 
     return pages
 
@@ -395,7 +391,7 @@ def ingest_pdf_bytes(
     if not file_bytes:
         return {"error": "Empty file bytes received.", "source": filename}
 
-    pages = extract_pages(file_bytes)
+    pages = extract_pages(file_bytes, filename)
     if not pages:
         return {"error": f"No extractable text found in {filename}", "source": filename}
 
@@ -436,7 +432,7 @@ def ingest_pdf(
         file_bytes = f.read()
 
     filename = os.path.basename(filepath)
-    pages    = extract_pages(file_bytes)
+    pages    = extract_pages(file_bytes, filename)
 
     if not pages:
         return {"error": f"No extractable text found in {filename}", "source": filename}
@@ -518,7 +514,7 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
         file_bytes = f.read()
 
     filename = os.path.basename(filepath)
-    pages    = extract_pages(file_bytes)
+    pages    = extract_pages(file_bytes, filename)
 
     if not pages:
         print("ERROR: No extractable text found — aborting benchmark.")

@@ -4,7 +4,7 @@ Handles PDF ingestion, semantic chunk retrieval, and LLM-powered Q&A using Chrom
 
 **Owner:** Arham N., Noble A., Mohammed A.
 **Phase:** 2 — Core RAG + Summarization (Mar 11 – Mar 28)
-**Port:** runs behind the API gateway on port 8000
+**Port:** runs behind the API gateway on port 8001
 **Checklist:** `docs/checklist/RAG_POC_Checklist_1.pdf`
 
 ---
@@ -17,6 +17,8 @@ Handles PDF ingestion, semantic chunk retrieval, and LLM-powered Q&A using Chrom
 - [Ollama](https://ollama.com/) — local LLM inference
 
 ```bash
+python -m venv venv
+source venv/bin/activate  # (On Windows use: venv\Scripts\activate)
 pip install -r requirements.txt
 ```
 
@@ -47,13 +49,13 @@ ollama pull qwen2.5:7b-instruct
 From inside `backend/rag/`:
 
 ```bash
-python -m uvicorn api:app --reload
+python -m uvicorn api:app --reload --port 8001
 ```
 
 > Use `python -m uvicorn` instead of `uvicorn` on Windows if you get a PATH error.
 
-- API: **http://localhost:8000**
-- Interactive docs: **http://localhost:8000/docs**
+- API: **http://localhost:8001**
+- Interactive docs: **http://localhost:8001/docs**
 
 ---
 
@@ -97,7 +99,7 @@ Upload a PDF to ingest into ChromaDB.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/upload \
+curl -X POST http://localhost:8001/upload \
      -F "file=@your_document.pdf"
 ```
 
@@ -128,7 +130,7 @@ List all documents currently stored in ChromaDB.
 
 **Example:**
 ```bash
-curl http://localhost:8000/documents
+curl http://localhost:8001/documents
 ```
 
 **Response:**
@@ -152,7 +154,7 @@ Remove a document and all its chunks from ChromaDB.
 
 **Example:**
 ```bash
-curl -X DELETE http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
+curl -X DELETE http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
 ```
 
 **Response:**
@@ -179,7 +181,7 @@ Retrieve the full reconstructed text of an ingested document. Used by the API ga
 
 **Example:**
 ```bash
-curl http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
+curl http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
 ```
 
 **Response:**
@@ -224,7 +226,7 @@ Ask a natural-language question against an ingested document.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:8001/query \
      -H "Content-Type: application/json" \
      -d '{"question": "What medications were prescribed?", "document_id": "32f4419f-...", "mode": "fast"}'
 ```
