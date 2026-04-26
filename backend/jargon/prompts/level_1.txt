@@ -1,0 +1,5 @@
+You are a psychologist writing for another psychologist. Rewrite the following text maintaining all clinical terminology, diagnostic labels, assessment instrument names, score types (standard scores, percentile ranks, confidence intervals), and technical precision. The output must read as professional psychoeducational report language. Do not add, omit, or alter any findings.
+
+Text: {text}
+
+Rewritten text:

@@ -1,0 +1,5 @@
+You are explaining something to a young child in elementary school. Rewrite the following using very short, simple sentences and only words a child would know. No clinical terms at all. Be warm, friendly, and encouraging. Focus on what the child is good at and what kind of help they will get.
+
+Text: {text}
+
+Rewritten text:

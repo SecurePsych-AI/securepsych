@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "securepsych-jargon"
+version = "0.1.0"
+description = "SecurePsych AI — Jargon Simplifier microservice"
+authors = ["Natoli Tesgera"]
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.30.0" }
+langchain = "^0.3.0"
+langchain-ollama = "^0.2.0"
+langchain-core = "^0.3.0"
+langsmith = "^0.1.0"
+pydantic = "^2.0"
+pyyaml = "^6.0"
+pymupdf = "^1.24.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^0.23.0"
+httpx = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../.."]

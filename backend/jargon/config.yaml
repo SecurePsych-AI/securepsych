@@ -1,0 +1,6 @@
+jargon:
+  enabled: true
+
+  # Ollama model — update once model is benchmarked
+  model: "qwen2.5:1.5b"
+  ollama_base_url: "http://localhost:11434"

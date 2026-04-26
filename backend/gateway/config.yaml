@@ -1,7 +1,7 @@
 features:
   rag_enabled: true
   summarizer_enabled: true
-  jargon_enabled: false
+  jargon_enabled: true
   visualizer_enabled: false
   tasks_enabled: false
 
