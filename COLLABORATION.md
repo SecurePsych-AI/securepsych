@@ -117,13 +117,10 @@ securepsych/
 │   ├── gateway/        ← API gateway, port 8000
 │   ├── rag/            ← RAG Q&A service
 │   ├── summarizer/     ← Summarization service
-│   ├── jargon/         ← Jargon simplification (Phase 3)
-│   ├── visualizer/     ← Data visualization (Phase 3)
-│   └── task_manager/   ← Task manager (Phase 4)
-├── frontend/           ← React + Vite + TailwindCSS
+│   └── jargon/         ← Jargon simplification (Phase 3)
+├── frontend/           ← React + Vite + TailwindCSS (includes Data Visualization + Task Manager)
 ├── infra/              ← Docker, CI/CD configs
 ├── docs/               ← API docs, guides, troubleshooting
-├── .env.example        ← Copy to .env — never commit your .env
 └── README.md
 ```
 

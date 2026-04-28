@@ -46,12 +46,6 @@ def create_app() -> FastAPI:
     
     from proxy.jargon import router as jargon_router
     app.include_router(jargon_router, prefix="/api/jargon", tags=["jargon"])
-    
-    from proxy.visualizer import router as visualizer_router
-    app.include_router(visualizer_router, prefix="/api/visualizer", tags=["visualizer"])
-    
-    from proxy.tasks import router as tasks_router
-    app.include_router(tasks_router, prefix="/api/tasks", tags=["tasks"])
 
     return app
 

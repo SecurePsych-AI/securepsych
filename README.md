@@ -10,13 +10,14 @@ Student data never leaves the building. This repository never contains student d
 
 ## Project Status
 
-| Phase | Name                                   | Dates           | Status          |
-| ----- | -------------------------------------- | --------------- | --------------- |
-| 0     | Research Sprint                        | Feb 24 – Mar 5  | **Complete**    |
-| 1     | Infrastructure & Scaffold              | Mar 6 – Mar 10  | **ON-HOLD**     |
-| 2     | Core RAG + Summarization               | Mar 11 – Mar 28 | **IN PROGRESS** |
-| 3     | Jargon Simplifier + Data Visualization | Mar 29 – Apr 11 | Not started     |
-| 4     | Evaluation Task Manager                | Apr 12 – May    | Future scope    |
+| Phase | Name                                              | Dates           | Status          |
+| ----- | ------------------------------------------------- | --------------- | --------------- |
+| 0     | Research Sprint                                   | Feb 24 – Mar 5  | **Complete**    |
+| 1     | Infrastructure & Scaffold                         | Mar 6 – Mar 10  | **ON-HOLD**     |
+| 2     | Core RAG + Summarization                          | Mar 11 – Mar 28 | **IN PROGRESS** |
+| 3     | Jargon Simplifier                                 | Mar 29 – Apr 11 | **IN PROGRESS**     |
+| 4     | API Gateway & Auth                               | Apr 12 – Apr 25 | **IN PROGRESS**     |
+| 5     | Security Audit, Documentation Update | Apr 26 – May 2   | **IN PROGRESS**     |
 
 **First external milestone:** April 2026 stakeholder demo.
 
@@ -30,10 +31,8 @@ securepsych/
 │   ├── gateway/          ← API gateway — single entry point, port 8000
 │   ├── rag/              ← RAG Q&A service (ChromaDB + LLM)
 │   ├── summarizer/       ← Document summarization service
-│   ├── jargon/           ← Jargon simplification service (Phase 3)
-│   ├── visualizer/       ← Assessment data visualization service (Phase 3)
-│   └── task_manager/     ← Evaluation task manager (Phase 4)
-├── frontend/             ← React + Vite + TailwindCSS
+│   └── jargon/           ← Jargon simplification service (Phase 3)
+├── frontend/             ← React + Vite + TailwindCSS (includes Data Visualization + Task Manager components)
 ├── infra/
 │   ├── docker-compose.yml
 │   ├── .woodpecker.yml   ← CI/CD pipeline (Woodpecker CI)
@@ -53,19 +52,18 @@ securepsych/
 
 ## Architecture Overview
 
-Five independent Python/FastAPI services run on separate ports behind a single API gateway. The frontend only ever talks to the gateway — never to individual services directly.
+Three independent Python/FastAPI AI services run on separate ports behind a single API gateway. The frontend only ever talks to the gateway — never to individual services directly. Data Visualization and Task Manager are React components in the frontend (no backend service required).
 
 ```
 Browser / Frontend (React + Vite)
-        │
-        ▼
-   API Gateway :8000 / Task Manager
-        │
-   ┌────┴────────────────────────────────┐
-   │                                     │
-RAG Q&A     Summarizer    Jargon    Visualizer
-   │              │
-   └──── ChromaDB (shared vector store) ────┘
+  │  [Data Visualization + Task Manager live here as React components]
+  │
+  ▼
+API Gateway :8000
+  │
+  ├── RAG Q&A :8001 ──── ChromaDB (shared vector store)
+  ├── Summarizer :8002
+  └── Jargon Simplifier :8003
 
 All services run on a single physical machine on the school LAN.
 No service communicates with the internet during normal operation.

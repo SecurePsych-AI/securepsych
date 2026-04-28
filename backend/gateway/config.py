@@ -8,8 +8,6 @@ class FeatureFlags(BaseModel):
     rag_enabled: bool = True
     summarizer_enabled: bool = True
     jargon_enabled: bool = False
-    visualizer_enabled: bool = False
-    tasks_enabled: bool = False
 
 class AuthSettings(BaseModel):
     backend: str = "local_jwt"
@@ -18,8 +16,6 @@ class ServiceUrls(BaseModel):
     rag_url: str
     summarizer_url: str
     jargon_url: str
-    visualizer_url: str
-    tasks_url: str
 
 class StorageSettings(BaseModel):
     log_dir: str = "/mnt/securepsych/data/gateway"
