@@ -6,7 +6,8 @@ features:
   tasks_enabled: false
 
 auth:
-  backend: "local_jwt"
+  backend: "local_jwt"       # "local_jwt" | "school_directory"
+  token_expiry_hours: 8
 
 services:
   rag_url: "http://localhost:8001"
@@ -16,4 +17,4 @@ services:
   tasks_url: "http://localhost:8005"
 
 storage:
-  log_dir: "/mnt/securepsych/data/gateway"
+  log_dir: "/mnt/securepsych/data/gateway/logs"

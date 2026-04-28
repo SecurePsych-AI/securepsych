@@ -1,6 +1,8 @@
-jargon:
-  enabled: true
+# config.yaml — committed
+simplification:
+  default_level: 3
+  min_level: 1
+  max_level: 5
 
-  # Ollama model — update once model is benchmarked
-  model: "qwen2.5:1.5b"
-  ollama_base_url: "http://localhost:11434"
+storage:
+  temp_dir: "/mnt/securepsych/data/temp/jargon"

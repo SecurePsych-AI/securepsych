@@ -46,11 +46,11 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
 # ---------------------------------------------------------------------------
-CHROMA_PATH: str     = os.getenv("CHROMA_PATH",      "./chroma")
-COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
+CHROMA_PATH: str       = os.environ["CHROMA_PATH"]
+COLLECTION_NAME: str   = os.environ["CHROMA_COLLECTION"]
 
-CHUNK_SIZE: int    = int(os.getenv("CHUNK_SIZE",    "600"))
-CHUNK_OVERLAP: float = float(os.getenv("CHUNK_OVERLAP", "0.20"))  # 20% overlap (sliding-window only)
+CHUNK_SIZE: int        = int(os.environ["CHUNK_SIZE"])
+CHUNK_OVERLAP: float   = float(os.environ["CHUNK_OVERLAP"])  # decimal fraction, e.g. 0.10 = 10% overlap
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ def strip_boilerplate(text: str, boilerplate: set[str]) -> str:
     return cleaned.strip()
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_URL = os.environ["OLLAMA_BASE_URL"]
 
 def extract_pages(file_bytes: bytes, filename: str) -> list[dict]:
     """

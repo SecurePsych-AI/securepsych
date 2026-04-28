@@ -1,14 +1,7 @@
-summarizer:
-  enabled: true
-
-  # Ollama model — update once model is benchmarked in Phase 1
-  model: "qwen2.5:1.5b"
-  ollama_base_url: "http://localhost:11434"
-
-  # Chunking — revisit after Research 1 & 2 findings from RAG team
-  chunk_size: 2000 # characters per chunk
+summarization:
+  chunk_size: 2000
   chunk_overlap: 200
 
-  # Storage — all temp/intermediate files must live under the LUKS-encrypted mount
+storage:
+  temp_dir: "/mnt/securepsych/data/temp/summarizer"  
   encrypted_storage_path: "/mnt/securepsych/data"
-  temp_dir: "/tmp/securepsych/summarizer"

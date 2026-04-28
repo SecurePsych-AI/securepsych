@@ -19,7 +19,7 @@ except ImportError:
     from backend.shared.extraction import extract_pdf
 
 _MAX_PDF_BYTES = 50 * 1024 * 1024
-_OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+_OLLAMA_BASE_URL = os.environ["OLLAMA_BASE_URL"]
 
 # Load all prompt templates at startup — fail fast if any file is missing
 _PROMPT_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -94,7 +94,7 @@ async def simplify(request: Request) -> SimplifyResponse:
         if len(pdf_bytes) > _MAX_PDF_BYTES:
             raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size")
 
-        result = await extract_pdf(pdf_bytes, file.filename or "upload.pdf", _OLLAMA_URL)
+        result = await extract_pdf(pdf_bytes, file.filename or "upload.pdf", _OLLAMA_BASE_URL)
         text = result.full_text
         if not text.strip():
             raise HTTPException(status_code=422, detail="No extractable text found in the PDF")

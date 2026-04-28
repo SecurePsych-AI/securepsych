@@ -9,7 +9,7 @@ from backend.shared.extraction import extract_pdf
 logger = logging.getLogger(__name__)
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_URL = os.environ["OLLAMA_BASE_URL"]
 
 def load_pdf_from_bytes(
     pdf_bytes: bytes,

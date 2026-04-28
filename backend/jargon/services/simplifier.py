@@ -1,6 +1,5 @@
 import logging
 import os
-import yaml
 
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
@@ -8,16 +7,12 @@ from langchain_core.output_parsers import StrOutputParser
 
 logger = logging.getLogger(__name__)
 
-
-def _load_config() -> dict:
-    path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
-    with open(path) as f:
-        return yaml.safe_load(f)
+_OLLAMA_BASE_URL = os.environ["OLLAMA_BASE_URL"]
+_OLLAMA_MODEL = os.environ["OLLAMA_MODEL"]
 
 
 async def run_simplify_chain(text: str, template: str) -> str:
-    cfg = _load_config()["jargon"]
-    llm = ChatOllama(model=cfg["model"], base_url=cfg["ollama_base_url"])
+    llm = ChatOllama(model=_OLLAMA_MODEL, base_url=_OLLAMA_BASE_URL)
     prompt = PromptTemplate(input_variables=["text"], template=template)
     chain = prompt | llm | StrOutputParser()
     logger.info("[jargon] Invoking simplify chain")

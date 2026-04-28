@@ -12,6 +12,12 @@ Endpoints:
 """
 
 import os
+
+# ── Security: enforce LangSmith data-scrubbing before any LangChain import ────
+os.environ["LANGCHAIN_HIDE_INPUTS"] = "true"
+os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
+# ─────────────────────────────────────────────────────────────────────────────
+
 from typing import Literal
 
 import chromadb
@@ -26,10 +32,10 @@ from rag_query import answer_question
 from ingestion import ingest_pdf_bytes
 
 # ---------------------------------------------------------------------------
-# Configuration (override via env vars)
+# Configuration (all keys required — no fallbacks; fail loudly on misconfiguration)
 # ---------------------------------------------------------------------------
-CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma")
-COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
+CHROMA_PATH: str     = os.environ["CHROMA_PATH"]
+COLLECTION_NAME: str = os.environ["CHROMA_COLLECTION"]
 
 # ---------------------------------------------------------------------------
 # App

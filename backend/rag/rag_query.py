@@ -15,10 +15,10 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
 # ---------------------------------------------------------------------------
-CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma")
-COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
-OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+CHROMA_PATH: str     = os.environ["CHROMA_PATH"]
+COLLECTION_NAME: str = os.environ["CHROMA_COLLECTION"]
+OLLAMA_BASE_URL: str = os.environ["OLLAMA_BASE_URL"]
+OLLAMA_MODEL: str    = os.environ["OLLAMA_MODEL"]
 
 DEFAULT_TOP_K: int = 3
 MAX_CONTEXT_CHARS: int = 8000  # guard against oversized prompts
