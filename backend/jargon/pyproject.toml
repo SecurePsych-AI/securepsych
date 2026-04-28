@@ -23,3 +23,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 pythonpath = [".", "../.."]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, no I/O, no network, no Ollama",
+    "jargon: Jargon service tests",
+    "ai: requires a live Ollama model",
+]

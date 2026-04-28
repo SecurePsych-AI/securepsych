@@ -4,6 +4,8 @@ import httpx
 from httpx import AsyncClient
 from config import settings
 
+pytestmark = [pytest.mark.gateway, pytest.mark.unit]
+
 @pytest.mark.asyncio
 @respx.mock
 async def test_summarizer_mode_b_document_id(async_client: AsyncClient, auth_headers):

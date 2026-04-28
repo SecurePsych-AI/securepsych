@@ -4,6 +4,8 @@ import httpx
 from httpx import AsyncClient
 from config import settings
 
+pytestmark = [pytest.mark.gateway, pytest.mark.unit]
+
 JARGON_URL = f"{settings.services.jargon_url}/simplify"
 
 _MOCK_RESPONSE = {

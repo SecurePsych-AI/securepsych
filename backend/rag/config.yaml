@@ -8,3 +8,4 @@ storage:
   chroma_path: "/mnt/securepsych/data/chroma"
   chroma_collection: "securepsych"
   temp_dir: "/mnt/securepsych/data/temp/rag"
+  encrypted_entity_maps: "/mnt/securepsych/data/entity_maps"

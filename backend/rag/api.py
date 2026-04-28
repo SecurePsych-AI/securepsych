@@ -23,13 +23,13 @@ from typing import Literal
 import chromadb
 from chromadb.config import Settings
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from pydantic import BaseModel
 
 load_dotenv()
 
 from rag_query import answer_question
-from ingestion import ingest_pdf_bytes
+from ingestion import ingest_pdf_bytes, ingest_from_preview, preview_pdf_bytes
 
 # ---------------------------------------------------------------------------
 # Configuration (all keys required — no fallbacks; fail loudly on misconfiguration)
@@ -67,10 +67,11 @@ def _get_collection():
 # Models
 # ---------------------------------------------------------------------------
 class QueryRequest(BaseModel):
-    question: str
+    question:    str
+    student_id:  str
     document_id: str | None = None
-    mode: Literal["fast", "deep"] = "fast"
-    top_k: int = 3
+    mode:        Literal["fast", "deep"] = "fast"
+    top_k:       int = 3
 
 
 # ---------------------------------------------------------------------------
@@ -82,8 +83,8 @@ class QueryRequest(BaseModel):
 #        -F "file=@sample_psycheval.pdf"
 # ---------------------------------------------------------------------------
 
-@app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+@app.post("/upload/preview")
+async def preview_document(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -92,7 +93,31 @@ async def upload_document(file: UploadFile = File(...)):
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    result = ingest_pdf_bytes(file_bytes, file.filename)
+    result = preview_pdf_bytes(file_bytes, file.filename)
+
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+
+    return result
+
+
+@app.post("/upload")
+async def upload_document(
+    file:          UploadFile = File(...),
+    student_id:    str        = Form(...),
+    strategy:      str        = Form("standard"),
+    preview_token: str | None = Form(None),
+):
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    if preview_token:
+        result = ingest_from_preview(preview_token, student_id, strategy)
+    else:
+        file_bytes = await file.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        result = ingest_pdf_bytes(file_bytes, file.filename, student_id, strategy)
 
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
@@ -109,9 +134,12 @@ async def upload_document(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------------
 
 @app.get("/documents")
-def list_documents():
+def list_documents(student_id: str):
     collection = _get_collection()
-    results = collection.get(include=["metadatas"])
+    results = collection.get(
+        include=["metadatas"],
+        where={"student_id": student_id},
+    )
     metadatas = results.get("metadatas", [])
 
     # Deduplicate by document_id — one entry per document, not per chunk
@@ -232,5 +260,6 @@ def query_document(request: QueryRequest):
         mode=request.mode,
         top_k=request.top_k,
         document_id=request.document_id,
+        student_id=request.student_id,
     )
     return result

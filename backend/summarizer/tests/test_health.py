@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 from main import app
 
+pytestmark = [pytest.mark.summarizer, pytest.mark.unit]
+
 client = TestClient(app)
 
 

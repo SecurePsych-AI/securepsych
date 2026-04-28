@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 
 from main import app
 
+pytestmark = [pytest.mark.jargon, pytest.mark.unit]
+
 client = TestClient(app)
 
 _SAMPLE_OUTPUT = "Your child has some challenges with reading but is making great progress."

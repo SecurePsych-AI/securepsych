@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import patch
 from backend.summarizer.services.pdf_loader import load_pdf_from_bytes
+
+pytestmark = [pytest.mark.summarizer, pytest.mark.unit]
 from backend.shared.extraction import ExtractionResult, PageResult, ExtractionMeta
 
 def test_load_pdf_from_bytes():

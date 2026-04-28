@@ -3,30 +3,94 @@ from unittest.mock import patch
 from backend.rag.ingestion import extract_pages
 from backend.shared.extraction import ExtractionResult, PageResult, ExtractionMeta
 
+pytestmark = pytest.mark.rag
+
+
+def _passthrough_redact(text, counters, entity_map):
+    """Identity stand-in for redact_page — no spaCy required."""
+    return text
+
+
+@pytest.mark.unit
 def test_extract_pages_with_boilerplate():
-    # Setup mock shared extraction result
     meta = ExtractionMeta(is_scanned=False, word_count=20, estimated_tokens=5, extraction_method="fitz")
-    
+
     page1 = PageResult(page_num=1, text="CONFIDENTIAL REPORT HEADER\nHere is valid text one.\nPAGE NUMBER FOOTER", char_count=100, used_vision=False)
     page2 = PageResult(page_num=2, text="CONFIDENTIAL REPORT HEADER\nHere is valid text two.\nPAGE NUMBER FOOTER", char_count=100, used_vision=False)
     page3 = PageResult(page_num=3, text="CONFIDENTIAL REPORT HEADER\nHere is valid text three.\nPAGE NUMBER FOOTER", char_count=100, used_vision=False)
-    
+
     result = ExtractionResult(
         filename="test.pdf",
         page_count=3,
         full_text="...",
         pages=[page1, page2, page3],
-        metadata=meta
+        metadata=meta,
+    )
+
+    async def mock_extract(*args, **kwargs):
+        return result
+
+    with patch('backend.rag.ingestion.extract_pdf', new=mock_extract), \
+         patch('backend.rag.ingestion.redact_page', side_effect=_passthrough_redact):
+        pages, entity_map = extract_pages(b"fake", "test.pdf")
+
+        assert len(pages) == 3
+        # Ensure boilerplate is stripped
+        assert "CONFIDENTIAL REPORT HEADER" not in pages[0]["text"]
+        assert "PAGE NUMBER FOOTER" not in pages[1]["text"]
+        assert "Here is valid text one." in pages[0]["text"]
+        assert isinstance(entity_map, dict)
+
+
+@pytest.mark.integration
+@pytest.mark.requires_spacy
+def test_extract_pages_redacts_real_name():
+    meta = ExtractionMeta(is_scanned=False, word_count=20, estimated_tokens=5, extraction_method="fitz")
+    page1 = PageResult(
+        page_num=1,
+        text="Student: Marcus Johnson\nDate of Birth: 1/15/2012\nHere is clinical text.",
+        char_count=70,
+        used_vision=False,
+    )
+    result = ExtractionResult(
+        filename="test_pii.pdf",
+        page_count=1,
+        full_text="...",
+        pages=[page1],
+        metadata=meta,
     )
 
     async def mock_extract(*args, **kwargs):
         return result
 
     with patch('backend.rag.ingestion.extract_pdf', new=mock_extract):
-        pages = extract_pages(b"fake", "test.pdf")
-        
-        assert len(pages) == 3
-        # Ensure boilerplate is stripped
-        assert "CONFIDENTIAL REPORT HEADER" not in pages[0]["text"]
-        assert "PAGE NUMBER FOOTER" not in pages[1]["text"]
-        assert "Here is valid text one." in pages[0]["text"]
+        pages, entity_map = extract_pages(b"fake", "test_pii.pdf")
+        assert len(pages) == 1
+        assert "Marcus Johnson" not in pages[0]["text"]
+        assert "STUDENT_NAME_1" in pages[0]["text"]
+
+
+@pytest.mark.integration
+@pytest.mark.requires_spacy
+def test_extract_pages_entity_map_populated():
+    meta = ExtractionMeta(is_scanned=False, word_count=20, estimated_tokens=5, extraction_method="fitz")
+    page1 = PageResult(
+        page_num=1,
+        text="Student: Marcus Johnson was evaluated for learning disabilities.",
+        char_count=65,
+        used_vision=False,
+    )
+    result = ExtractionResult(
+        filename="test_map.pdf",
+        page_count=1,
+        full_text="...",
+        pages=[page1],
+        metadata=meta,
+    )
+
+    async def mock_extract(*args, **kwargs):
+        return result
+
+    with patch('backend.rag.ingestion.extract_pdf', new=mock_extract):
+        pages, entity_map = extract_pages(b"fake", "test_map.pdf")
+        assert "Marcus Johnson" in entity_map.values()

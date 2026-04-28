@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+pytestmark = [pytest.mark.gateway, pytest.mark.unit]
+
 @pytest.mark.asyncio
 async def test_health_check_no_auth(async_client: AsyncClient):
     response = await async_client.get("/health")

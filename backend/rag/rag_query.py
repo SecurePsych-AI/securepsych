@@ -222,6 +222,7 @@ def retrieve_chunks(
     query: str,
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
+    student_id: str | None = None,
 ) -> list[dict]:
     """
     Run a ChromaDB vector similarity search, over-fetch candidates, rerank them,
@@ -229,7 +230,19 @@ def retrieve_chunks(
     """
     collection = _get_collection()
 
-    where_filter = {"document_id": document_id} if document_id else None
+    filters = []
+    if document_id:
+        filters.append({"document_id": {"$eq": document_id}})
+    if student_id:
+        filters.append({"student_id": {"$eq": student_id}})
+
+    if len(filters) == 0:
+        where_filter = None
+    elif len(filters) == 1:
+        where_filter = filters[0]
+    else:
+        where_filter = {"$and": filters}
+
     fetch_k = max(top_k * 4, 8)
 
     results = collection.query(
@@ -282,11 +295,12 @@ def deep_retrieve_chunks(
     query: str,
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
+    student_id: str | None = None,
 ) -> list[dict]:
     """
     Two-step retrieval that expands matched chunks to their full page section.
     """
-    seed_chunks = retrieve_chunks(query, top_k=top_k, document_id=document_id)
+    seed_chunks = retrieve_chunks(query, top_k=top_k, document_id=document_id, student_id=student_id)
     if not seed_chunks:
         return []
 
@@ -304,15 +318,16 @@ def deep_retrieve_chunks(
         except ValueError:
             continue
 
+        and_clauses: list[dict] = [{"page": {"$eq": page_int}}]
         if document_id:
-            where_clause = {
-                "$and": [
-                    {"page": {"$eq": page_int}},
-                    {"document_id": {"$eq": document_id}},
-                ]
-            }
+            and_clauses.append({"document_id": {"$eq": document_id}})
+        if student_id:
+            and_clauses.append({"student_id": {"$eq": student_id}})
+
+        if len(and_clauses) == 1:
+            where_clause = and_clauses[0]
         else:
-            where_clause = {"page": page_int}
+            where_clause = {"$and": and_clauses}
 
         results = collection.get(
             where=where_clause,
@@ -412,14 +427,15 @@ def answer_question(
     mode: Literal["fast", "deep"] = "fast",
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
+    student_id: str | None = None,
 ) -> dict:
     """
     Answer a question using the RAG pipeline.
     """
     if mode == "deep":
-        chunks = deep_retrieve_chunks(question, top_k=top_k, document_id=document_id)
+        chunks = deep_retrieve_chunks(question, top_k=top_k, document_id=document_id, student_id=student_id)
     else:
-        chunks = retrieve_chunks(question, top_k=top_k, document_id=document_id)
+        chunks = retrieve_chunks(question, top_k=top_k, document_id=document_id, student_id=student_id)
 
     if not chunks:
         return {

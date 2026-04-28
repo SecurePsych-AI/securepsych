@@ -2,6 +2,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 from backend.shared.extraction import extract_pdf
 
+pytestmark = [pytest.mark.unit]
+
 @pytest.mark.asyncio
 async def test_extract_pdf_vision_fallback():
     # Mock fitz to return a page with < 50 chars

@@ -1,5 +1,8 @@
 import re
+import pytest
 from routes.simplify import _TEMPLATES
+
+pytestmark = [pytest.mark.jargon, pytest.mark.unit]
 
 
 def test_all_five_levels_loaded():

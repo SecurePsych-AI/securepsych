@@ -1,4 +1,7 @@
+import pytest
 from utils.flesch_kincaid import flesch_kincaid_grade, _count_syllables
+
+pytestmark = [pytest.mark.jargon, pytest.mark.unit]
 
 
 def test_simple_text_low_grade():
