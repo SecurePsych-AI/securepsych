@@ -5,18 +5,16 @@ import re
 from collections import Counter
 from typing import Literal
 
-import chromadb
-from chromadb.config import Settings
 from dotenv import load_dotenv
 from langchain_ollama import OllamaLLM
 
 load_dotenv()
 
+from chroma_client import _ensure_collection
+
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
 # ---------------------------------------------------------------------------
-CHROMA_PATH: str     = os.environ["CHROMA_PATH"]
-COLLECTION_NAME: str = os.environ["CHROMA_COLLECTION"]
 OLLAMA_BASE_URL: str = os.environ["OLLAMA_BASE_URL"]
 OLLAMA_MODEL: str    = os.environ["OLLAMA_MODEL"]
 
@@ -24,24 +22,9 @@ DEFAULT_TOP_K: int = 3
 MAX_CONTEXT_CHARS: int = 8000  # guard against oversized prompts
 
 # ---------------------------------------------------------------------------
-# Lazy singletons
+# Lazy singleton — LLM only (ChromaDB moved to chroma_client.py)
 # ---------------------------------------------------------------------------
-_collection = None
 _llm: OllamaLLM | None = None
-
-
-def _get_collection():
-    global _collection
-    if _collection is None:
-        client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        _collection = client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
 
 
 def _get_llm() -> OllamaLLM:
@@ -222,26 +205,20 @@ def retrieve_chunks(
     query: str,
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
-    student_id: str | None = None,
+    student_id: str = "",
 ) -> list[dict]:
     """
     Run a ChromaDB vector similarity search, over-fetch candidates, rerank them,
     and return the best top_k chunks.
     """
-    collection = _get_collection()
+    assert student_id, "student_id is required — omitting it bypasses FERPA namespace isolation"
+    collection = _ensure_collection()
 
-    filters = []
+    filters: list[dict] = [{"student_id": {"$eq": student_id}}]
     if document_id:
         filters.append({"document_id": {"$eq": document_id}})
-    if student_id:
-        filters.append({"student_id": {"$eq": student_id}})
 
-    if len(filters) == 0:
-        where_filter = None
-    elif len(filters) == 1:
-        where_filter = filters[0]
-    else:
-        where_filter = {"$and": filters}
+    where_filter = filters[0] if len(filters) == 1 else {"$and": filters}
 
     fetch_k = max(top_k * 4, 8)
 
@@ -295,7 +272,7 @@ def deep_retrieve_chunks(
     query: str,
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
-    student_id: str | None = None,
+    student_id: str = "",
 ) -> list[dict]:
     """
     Two-step retrieval that expands matched chunks to their full page section.
@@ -309,7 +286,7 @@ def deep_retrieve_chunks(
         page_str = _page_from_parent_id(chunk["parent_id"])
         matched_pages.add(page_str)
 
-    collection = _get_collection()
+    collection = _ensure_collection()
     expanded: dict[str, dict] = {}
 
     for page_str in matched_pages:
@@ -427,11 +404,12 @@ def answer_question(
     mode: Literal["fast", "deep"] = "fast",
     top_k: int = DEFAULT_TOP_K,
     document_id: str | None = None,
-    student_id: str | None = None,
+    student_id: str = "",
 ) -> dict:
     """
     Answer a question using the RAG pipeline.
     """
+    assert student_id, "student_id is required — omitting it bypasses FERPA namespace isolation"
     if mode == "deep":
         chunks = deep_retrieve_chunks(question, top_k=top_k, document_id=document_id, student_id=student_id)
     else:

@@ -38,13 +38,11 @@ import textwrap
 import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 from cryptography.fernet import Fernet
 
 import chromadb
 from backend.shared.extraction import extract_pdf
 from backend.shared.redaction import redact_page
-from chromadb.config import Settings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -62,26 +60,7 @@ ENCRYPTED_ENTITY_MAP_PATH: str = os.environ["ENCRYPTED_ENTITY_MAP_PATH"]
 ENTITY_MAP_FERNET_KEY: bytes   = os.environ["ENTITY_MAP_FERNET_KEY"].encode()
 
 
-# ---------------------------------------------------------------------------
-# ChromaDB client — lazy singleton (mirrors rag_query.py and api.py)
-# ---------------------------------------------------------------------------
-_client: Optional[object] = None
-_collection: Optional[object] = None
-
-
-def _get_collection():
-    """Return (and lazily create) the ChromaDB collection."""
-    global _client, _collection
-    if _collection is None:
-        _client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
+from chroma_client import _ensure_collection
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +344,7 @@ def _store_chunks(
     redaction_key: str,
 ) -> dict:
     """Write chunks to ChromaDB and return a summary dict."""
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     ids:       list[str]  = []
     documents: list[str]  = []
@@ -512,7 +491,7 @@ def ingest_pdf(
 
 def list_sources() -> list[str]:
     """Return unique source filenames that have been ingested."""
-    collection = _get_collection()
+    collection = _ensure_collection()
     results    = collection.get(include=["metadatas"])
     sources    = {m["source"] for m in results["metadatas"] if m}
     return sorted(sources)
@@ -520,7 +499,7 @@ def list_sources() -> list[str]:
 
 def delete_source(source_name: str) -> int:
     """Remove all chunks belonging to *source_name*. Returns number of deleted chunks."""
-    collection     = _get_collection()
+    collection     = _ensure_collection()
     results        = collection.get(include=["metadatas"], where={"source": source_name})
     ids_to_delete  = results["ids"]
     if ids_to_delete:

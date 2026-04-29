@@ -20,47 +20,20 @@ os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
 
 from typing import Literal
 
-import chromadb
-from chromadb.config import Settings
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 load_dotenv()
 
 from rag_query import answer_question
 from ingestion import ingest_pdf_bytes, ingest_from_preview, preview_pdf_bytes
-
-# ---------------------------------------------------------------------------
-# Configuration (all keys required — no fallbacks; fail loudly on misconfiguration)
-# ---------------------------------------------------------------------------
-CHROMA_PATH: str     = os.environ["CHROMA_PATH"]
-COLLECTION_NAME: str = os.environ["CHROMA_COLLECTION"]
+from chroma_client import _ensure_collection
 
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(title="RAG API", version="2.0")
-
-# ---------------------------------------------------------------------------
-# ChromaDB client (lazy singleton — mirrors ingestion.py and rag_query.py)
-# ---------------------------------------------------------------------------
-_client = None
-_collection = None
-
-
-def _get_collection():
-    global _client, _collection
-    if _collection is None:
-        _client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
 
 
 # ---------------------------------------------------------------------------
@@ -73,13 +46,20 @@ class QueryRequest(BaseModel):
     mode:        Literal["fast", "deep"] = "fast"
     top_k:       int = 3
 
+    @field_validator("student_id")
+    @classmethod
+    def student_id_must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("student_id is required and must not be empty")
+        return v
+
 
 # ---------------------------------------------------------------------------
 # POST /upload
 # Upload and ingest a PDF file into ChromaDB.
 #
 # Usage:
-#   curl -X POST http://localhost:8000/upload \
+#   curl -X POST http://localhost:8001/upload \
 #        -F "file=@sample_psycheval.pdf"
 # ---------------------------------------------------------------------------
 
@@ -130,12 +110,12 @@ async def upload_document(
 # List all documents currently stored in ChromaDB.
 #
 # Usage:
-#   curl http://localhost:8000/documents
+#   curl http://localhost:8001/documents
 # ---------------------------------------------------------------------------
 
 @app.get("/documents")
 def list_documents(student_id: str):
-    collection = _get_collection()
+    collection = _ensure_collection()
     results = collection.get(
         include=["metadatas"],
         where={"student_id": student_id},
@@ -165,12 +145,12 @@ def list_documents(student_id: str):
 # Remove all chunks belonging to a document from ChromaDB.
 #
 # Usage:
-#   curl -X DELETE http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
+#   curl -X DELETE http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
 # ---------------------------------------------------------------------------
 
 @app.delete("/documents/{document_id}")
 def delete_document(document_id: str):
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     results = collection.get(
         where={"document_id": document_id},
@@ -207,12 +187,12 @@ def delete_document(document_id: str):
 # The gateway consumer forwards bytes as-is; downstream re-chunking handles the overlap.
 #
 # Usage:
-#   curl http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
+#   curl http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
 # ---------------------------------------------------------------------------
 
 @app.get("/documents/{document_id}/content")
 def get_document_content(document_id: str):
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     results = collection.get(
         where={"document_id": document_id},
@@ -248,7 +228,7 @@ def get_document_content(document_id: str):
 # Ask a question against an ingested document (or all documents).
 #
 # Usage:
-#   curl -X POST http://localhost:8000/query \
+#   curl -X POST http://localhost:8001/query \
 #        -H "Content-Type: application/json" \
 #        -d '{"question": "What medications were prescribed?", "document_id": "...", "mode": "fast"}'
 # ---------------------------------------------------------------------------

@@ -1,8 +1,15 @@
 import os
 import shutil
+import sys
 import tempfile
 
 import pytest
+
+# Ensure backend/rag/ is on sys.path so that intra-service imports like
+# `from chroma_client import _ensure_collection` resolve correctly when
+# test files import modules via the `backend.rag.*` package path.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+os.environ["CHROMA_COLLECTION"] = "securepsych_test"
 
 _CHROMA_TMP = tempfile.mkdtemp(prefix="securepsych_test_chroma_")
 _ENTITY_MAP_TMP = tempfile.mkdtemp(prefix="securepsych_test_entity_maps_")

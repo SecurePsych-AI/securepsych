@@ -1,15 +1,25 @@
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
+from db import create_all_tables
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await create_all_tables()
+    yield
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="SecurePsych API Gateway",
         description="FERPA-compliant API gateway routing to core deterministic microservices.",
         version="1.0.0",
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -37,15 +47,18 @@ def create_app() -> FastAPI:
     # Routers
     from auth.routes import router as auth_router
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
-    
+
     from proxy.rag import router as rag_router
     app.include_router(rag_router, prefix="/api/rag", tags=["rag"])
-    
+
     from proxy.summarizer import router as summarizer_router
     app.include_router(summarizer_router, prefix="/api/summarize", tags=["summarizer"])
-    
+
     from proxy.jargon import router as jargon_router
     app.include_router(jargon_router, prefix="/api/jargon", tags=["jargon"])
+
+    from routes.projects import router as projects_router
+    app.include_router(projects_router, prefix="/api/projects", tags=["projects"])
 
     return app
 

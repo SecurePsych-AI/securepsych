@@ -1,0 +1,120 @@
+{
+  "_description": "Mock payloads for the Gateway project/history endpoints (port 8000). All requests require Authorization: Bearer <token>.",
+
+  "create_project_request": {
+    "method": "POST",
+    "url": "http://localhost:8000/api/projects",
+    "content_type": "application/json",
+    "body": {
+      "student_id": "district-id-98765",
+      "display_label": "Case 2024-031"
+    }
+  },
+
+  "create_project_response_201": {
+    "id": "a1b2c3d4-0001-0001-0001-000000000001",
+    "display_label": "Case 2024-031",
+    "created_at": "2024-09-03T14:22:07.123456+00:00"
+  },
+
+  "list_projects_response_200": [
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "display_label": "Case 2024-031",
+      "created_at": "2024-09-03T14:22:07.123456+00:00"
+    },
+    {
+      "id": "b2c3d4e5-0002-0002-0002-000000000002",
+      "display_label": "Case 2024-018",
+      "created_at": "2024-08-15T09:10:31.000000+00:00"
+    }
+  ],
+
+  "list_files_response_200": [
+    {
+      "id": "c3d4e5f6-0003-0003-0003-000000000003",
+      "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+      "filename_redacted": "eval_2024_REDACTED.pdf",
+      "strategy": "standard",
+      "chunks_added": 187,
+      "uploaded_at": "2024-09-03T14:30:55.000000+00:00"
+    }
+  ],
+
+  "list_threads_response_200": [
+    {
+      "id": "cc1d2e3f-4a5b-6c7d-8e9f-a0b1c2d3e4f5",
+      "title": null,
+      "created_at": "2024-09-03T14:45:00.000000+00:00"
+    }
+  ],
+
+  "get_thread_response_200": {
+    "id": "cc1d2e3f-4a5b-6c7d-8e9f-a0b1c2d3e4f5",
+    "title": null,
+    "created_at": "2024-09-03T14:45:00.000000+00:00",
+    "messages": [
+      {
+        "id": "d1e2f3a4-b5c6-7d8e-9f0a-b1c2d3e4f5a6",
+        "role": "user",
+        "content": "What cognitive assessments were administered and what were the composite scores?",
+        "sources": [],
+        "created_at": "2024-09-03T14:45:00.000000+00:00"
+      },
+      {
+        "id": "e2f3a4b5-c6d7-8e9f-0a1b-c2d3e4f5a6b7",
+        "role": "assistant",
+        "content": "The Wechsler Intelligence Scale for Children (WISC-V) was administered. The student obtained a Full Scale IQ (FSIQ) composite score of 88, placing performance in the Low Average range (25th percentile).",
+        "sources": [
+          {
+            "source": "eval_2024_REDACTED.pdf",
+            "page": 12,
+            "parent_id": "12_2",
+            "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98"
+          }
+        ],
+        "created_at": "2024-09-03T14:45:03.000000+00:00"
+      }
+    ]
+  },
+
+  "list_summaries_response_200": [
+    {
+      "id": "f3a4b5c6-d7e8-9f0a-1b2c-d3e4f5a6b7c8",
+      "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+      "filename_redacted": "eval_2024_REDACTED.pdf",
+      "summary": "Psychoeducational Evaluation Summary\n\nStudent diagnosed with Specific Learning Disability in Reading (Dyslexia). WISC-V FSIQ: 88 (Low Average). WIAT-4 Word Reading: 74 (4th percentile). Recommendations include Orton-Gillingham instruction and extended time accommodations.",
+      "page_count": 24,
+      "created_at": "2024-09-03T15:02:11.000000+00:00"
+    }
+  ],
+
+  "list_jargon_runs_response_200": [
+    {
+      "id": "a4b5c6d7-e8f9-0a1b-2c3d-e4f5a6b7c8d9",
+      "level": 3,
+      "input_preview": "The examinee demonstrated significant deficits in phonological processing as measured by the CTOPP-2, with a Phonological Memory Composite of 74 (4th percentil",
+      "simplified_text": "The testing showed that your child has difficulty with the sound-based building blocks of reading...",
+      "fk_grade": 7.1,
+      "created_at": "2024-09-03T15:10:45.000000+00:00"
+    }
+  ],
+
+  "error_responses": {
+    "422_pii_in_label": {
+      "detail": [
+        {
+          "loc": ["body", "display_label"],
+          "msg": "Value error, display_label must not contain PII patterns (SSN, DOB, or district ID). Use a case code such as 'Case 2024-031' instead.",
+          "type": "value_error"
+        }
+      ]
+    },
+    "404_project_not_found": {
+      "detail": "Project not found"
+    },
+    "401_unauthenticated": {
+      "detail": "Missing or invalid Authorization header"
+    }
+  }
+}
