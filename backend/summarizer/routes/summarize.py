@@ -57,7 +57,7 @@ async def summarize_document(
         raise HTTPException(
             status_code=413, detail=f"PDF exceeds maximum allowed size of {_MAX_PDF_BYTES} bytes.")
 
-    docs, page_count = load_pdf_from_bytes(pdf_bytes)
+    docs, page_count = await load_pdf_from_bytes(pdf_bytes)
 
     if not docs:
         raise HTTPException(

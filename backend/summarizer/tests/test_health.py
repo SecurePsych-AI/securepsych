@@ -44,4 +44,16 @@ def test_summarize_rejects_non_pdf(tmp_path):
     assert response.status_code == 422
 
 
+@pytest.mark.ai
+def test_summarize_smoke_ollama(redacted_eval_pdf_1):
+    """Upload a real hand-scrubbed PDF and verify Ollama returns a non-empty summary."""
+    with open(redacted_eval_pdf_1, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
 

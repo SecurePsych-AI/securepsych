@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import os
 
 from langchain_core.documents import Document
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.environ["OLLAMA_BASE_URL"]
 
-def load_pdf_from_bytes(
+async def load_pdf_from_bytes(
     pdf_bytes: bytes,
     chunk_size: int = 2000,
     chunk_overlap: int = 200,
@@ -23,7 +22,7 @@ def load_pdf_from_bytes(
     logger.info("[pdf_loader] Processing PDF with chunk_size: %d | chunk_overlap: %d",
                 chunk_size, chunk_overlap)
 
-    extraction_result = asyncio.run(extract_pdf(pdf_bytes, "uploaded_pdf", OLLAMA_URL))
+    extraction_result = await extract_pdf(pdf_bytes, "uploaded_pdf", OLLAMA_URL)
     page_count = extraction_result.page_count
     
     page_docs: list[Document] = []

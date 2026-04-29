@@ -132,3 +132,16 @@ def test_simplify_pdf_invalid_level_rejected(tmp_path):
 def test_simplify_unsupported_content_type():
     resp = client.post("/simplify", content=b"plain text", headers={"content-type": "text/plain"})
     assert resp.status_code == 415
+
+
+@pytest.mark.ai
+def test_simplify_smoke_ollama():
+    """Verify the simplify endpoint calls Ollama and returns a valid response."""
+    resp = client.post("/simplify", json={
+        "text": "The student demonstrates phonological processing deficits consistent with dyslexia.",
+        "level": 3,
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["simplified_text"]
+    assert isinstance(body["flesch_kincaid_grade"], float)

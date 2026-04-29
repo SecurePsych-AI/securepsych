@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from backend.rag.ingestion import extract_pages
+from backend.rag.ingestion import extract_pages, ingest_pdf_bytes
 from backend.shared.extraction import ExtractionResult, PageResult, ExtractionMeta
 
 pytestmark = pytest.mark.rag
@@ -94,3 +94,29 @@ def test_extract_pages_entity_map_populated():
     with patch('backend.rag.ingestion.extract_pdf', new=mock_extract):
         pages, entity_map = extract_pages(b"fake", "test_map.pdf")
         assert "Marcus Johnson" in entity_map.values()
+
+
+@pytest.mark.integration
+@pytest.mark.requires_spacy
+def test_extract_pages_real_pdf(redacted_eval_pdf_1):
+    """Full extraction + PII redaction pipeline on a hand-scrubbed eval PDF (no Ollama)."""
+    pages, entity_map = extract_pages(
+        redacted_eval_pdf_1.read_bytes(), redacted_eval_pdf_1.name
+    )
+    assert len(pages) > 0
+    assert all(p["text"] for p in pages)
+    assert isinstance(entity_map, dict)
+
+
+@pytest.mark.ai
+@pytest.mark.rag
+def test_ingest_produces_chunks(redacted_eval_pdf_1):
+    """Ingest a real PDF end-to-end and verify at least one chunk is stored in ChromaDB."""
+    result = ingest_pdf_bytes(
+        redacted_eval_pdf_1.read_bytes(),
+        "redacted_eval_1.pdf",
+        "test-student-001",
+        "standard",
+    )
+    assert result["status"] == "ok"
+    assert result["chunks_added"] > 0
