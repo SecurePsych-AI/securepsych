@@ -27,3 +27,24 @@ def redacted_eval_pdf_1() -> Path:
     if not path.exists():
         pytest.skip(f"redacted_eval_1.pdf not present — place hand-scrubbed PDF at backend/tests/fixtures/redacted_eval_1.pdf")
     return path
+
+
+@pytest.fixture(scope="session")
+def tiny_eval_pdf(tmp_path_factory) -> Path:
+    """Single-page synthetic eval PDF — ~400 chars → 1 chunk → 1 Ollama call."""
+    import fitz  # PyMuPDF
+    tmp = tmp_path_factory.mktemp("pdf_fixtures")
+    path = tmp / "tiny_eval.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text(
+        (72, 72),
+        "Student: [Redacted]. DOB: [Redacted]. Evaluation date: 2024-10-15.\n"
+        "Eligibility: Specific Learning Disability (SLD) in reading.\n"
+        "WISC-V Full Scale IQ: 95 (37th percentile).\n"
+        "WJ-IV Broad Reading: 78 (7th percentile).\n"
+        "Accommodations: Extended time (1.5x), preferential seating, "
+        "audiobooks for grade-level text.",
+    )
+    doc.save(str(path))
+    return path

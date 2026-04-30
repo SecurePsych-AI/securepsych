@@ -45,6 +45,21 @@ def test_summarize_rejects_non_pdf(tmp_path):
 
 
 @pytest.mark.ai
+def test_summarize_smoke_ollama_small(tiny_eval_pdf):
+    """Tiny synthetic PDF → 1 chunk → 1 Ollama call. Completes in ~30s."""
+    with open(tiny_eval_pdf, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("tiny_eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
+
+
+@pytest.mark.ai
+@pytest.mark.slow
 def test_summarize_smoke_ollama(redacted_eval_pdf_1):
     """Upload a real hand-scrubbed PDF and verify Ollama returns a non-empty summary."""
     with open(redacted_eval_pdf_1, "rb") as f:

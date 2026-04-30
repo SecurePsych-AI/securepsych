@@ -35,6 +35,9 @@ from chroma_client import _ensure_collection
 # ---------------------------------------------------------------------------
 app = FastAPI(title="RAG API", version="2.0")
 
+_MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB — guard against memory-exhaustion DoS
+_ALLOWED_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -65,11 +68,14 @@ class QueryRequest(BaseModel):
 
 @app.post("/upload/preview")
 async def preview_document(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
 
-    file_bytes = await file.read()
-
+    file_bytes = await file.read(_MAX_PDF_BYTES + 1)
+    if len(file_bytes) > _MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size.")
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
@@ -88,13 +94,17 @@ async def upload_document(
     strategy:      str        = Form("standard"),
     preview_token: str | None = Form(None),
 ):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
 
     if preview_token:
         result = ingest_from_preview(preview_token, student_id, strategy)
     else:
-        file_bytes = await file.read()
+        file_bytes = await file.read(_MAX_PDF_BYTES + 1)
+        if len(file_bytes) > _MAX_PDF_BYTES:
+            raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size.")
         if not file_bytes:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
         result = ingest_pdf_bytes(file_bytes, file.filename, student_id, strategy)

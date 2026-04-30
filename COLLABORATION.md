@@ -31,6 +31,53 @@
 
 ---
 
+## 🔐 Encrypted Dev Storage (FERPA requirement)
+
+The gateway stores its database and access logs on an encrypted volume. On the school server this is a LUKS mount at `/mnt/securepsych/`. On your dev machine the setup depends on your OS.
+
+**Linux** — `/mnt` is accessible. The paths in `config.yaml` and `.env.example` work as-is. Just create the directories and you're done:
+```bash
+sudo mkdir -p /mnt/securepsych/data/gateway/logs
+# set GATEWAY_DB_PATH=/mnt/securepsych/data/gateway/gateway.db in your .env
+```
+
+**macOS** — `/mnt` is part of the sealed APFS read-only system volume and cannot be written to. You need an encrypted disk image (AES-256, the macOS equivalent of LUKS). Do this once:
+
+```bash
+# 1. Create the encrypted sparse bundle (~500 MB, expandable)
+hdiutil create \
+  -size 500m \
+  -fs APFS \
+  -encryption AES-256 \
+  -volname "securepsych" \
+  ~/securepsych_dev.sparsebundle
+# You will be prompted to set a passphrase — use something strong and store it in your password manager.
+
+# 2. Mount it and create the directory structure
+hdiutil attach ~/securepsych_dev.sparsebundle -mountpoint /Volumes/securepsych
+mkdir -p /Volumes/securepsych/data/gateway/logs
+```
+
+Then set these two vars in `backend/gateway/.env`:
+```
+GATEWAY_DB_PATH=/Volumes/securepsych/data/gateway/gateway.db
+GATEWAY_LOG_DIR=/Volumes/securepsych/data/gateway/logs
+```
+
+**Every time you start the gateway** (until you set up auto-mount), run:
+```bash
+hdiutil attach ~/securepsych_dev.sparsebundle -mountpoint /Volumes/securepsych
+```
+
+When done for the day, detach it:
+```bash
+hdiutil detach /Volumes/securepsych
+```
+
+> `/tmp` and plain home-directory paths are not acceptable — they are unencrypted and would make any student data accessible to any process on the machine, which violates FERPA.
+
+---
+
 ## 📋 Workflow Rules
 
 ### 📺 Walkthrough

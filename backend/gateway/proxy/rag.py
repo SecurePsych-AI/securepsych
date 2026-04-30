@@ -1,6 +1,7 @@
 import logging
+import uuid as _uuid
 
-from fastapi import APIRouter, Form, Request, UploadFile, File, Response
+from fastapi import APIRouter, Form, HTTPException, Request, UploadFile, File, Response
 from fastapi.responses import JSONResponse
 from proxy.client import proxy_request
 from config import settings
@@ -9,6 +10,13 @@ from db import AsyncSessionLocal, crud
 logger = logging.getLogger(__name__)
 router = APIRouter()
 RAG_URL = settings.services.rag_url
+
+
+def _validate_uuid(value: str) -> None:
+    try:
+        _uuid.UUID(value, version=4)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="document_id must be a valid UUID v4")
 
 
 async def _resolve_project(session, project_id: str, user_id: str):
@@ -165,7 +173,21 @@ async def list_documents(request: Request, project_id: str):
 
 @router.get("/documents/{document_id}/content")
 async def get_document_content(request: Request, document_id: str):
+    _validate_uuid(document_id)
     user_id = getattr(request.state, "user_id", "unauthenticated")
+
+    from sqlalchemy import select
+    from db.models import UploadedFile, Project
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(UploadedFile).join(Project, UploadedFile.project_id == Project.id).where(
+                UploadedFile.document_id == document_id,
+                Project.owner_id == user_id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            return JSONResponse(status_code=403, content={"detail": "Document not found or access denied"})
+
     request.state.document_id = document_id
     resp = await proxy_request(method="GET", url=f"{RAG_URL}/documents/{document_id}/content", user_id=user_id)
     return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type"))
@@ -173,6 +195,7 @@ async def get_document_content(request: Request, document_id: str):
 
 @router.delete("/documents/{document_id}")
 async def delete_document(request: Request, document_id: str, project_id: str):
+    _validate_uuid(document_id)
     user_id = getattr(request.state, "user_id", "unauthenticated")
 
     # Verify project ownership and that the document belongs to this project

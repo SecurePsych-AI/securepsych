@@ -34,6 +34,12 @@ class ExtractionResult(BaseModel):
 
 async def _call_ollama_vision(base64_image: str, ollama_url: str) -> str:
     """Async POST request to Ollama's vision model."""
+    from urllib.parse import urlparse
+    _parsed = urlparse(ollama_url)
+    if _parsed.hostname not in ("localhost", "127.0.0.1"):
+        raise ValueError(
+            f"FERPA Violation: ollama_url must resolve to localhost. Got: {ollama_url}"
+        )
     payload = {
         "model": "llava:7b",
         "prompt": (

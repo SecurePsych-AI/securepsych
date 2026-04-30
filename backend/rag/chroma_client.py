@@ -49,10 +49,10 @@ def _ensure_collection() -> chromadb.Collection:
                 "hnsw:M": 16,
                 # ef_construction: search width during index build — 100 is the
                 # default; increase for higher recall if build time allows.
-                "hnsw:ef_construction": 100,
+                "hnsw_ef_construction": 100,
                 # ef (ef_search): query-time search width — 50 gives better recall
                 # than the default (10) with minimal latency impact on local hardware.
-                "hnsw:ef": 50,
+                "hnsw_ef": 50,
             },
         )
 

@@ -23,6 +23,14 @@ class User(Base):
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner")
 
 
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(String(36), primary_key=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Project(Base):
     __tablename__ = "projects"
 

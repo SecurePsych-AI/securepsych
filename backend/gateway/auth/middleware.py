@@ -31,15 +31,18 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid Authorization header"})
             
         token = auth_header.split(" ")[1]
-        
-        from .store import token_denylist
-        if token in token_denylist:
-            return JSONResponse(status_code=401, content={"detail": "Token revoked"})
-        
+
         try:
             payload = self.backend.verify_token(token)
         except Exception:
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+        jti = payload.get("jti")
+        if jti:
+            from db import AsyncSessionLocal, crud
+            async with AsyncSessionLocal() as session:
+                if await crud.is_token_revoked(session, jti):
+                    return JSONResponse(status_code=401, content={"detail": "Token revoked"})
 
         role = payload.get("role")
         if role not in ALLOWED_ROLES:

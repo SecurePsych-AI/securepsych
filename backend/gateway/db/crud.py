@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from .models import (
     JargonRun,
     Message,
     Project,
+    RevokedToken,
     SummaryRun,
     UploadedFile,
     User,
@@ -29,6 +31,41 @@ async def get_or_create_user(session: AsyncSession, user_id: str, role: str) -> 
         session.add(user)
         await session.flush()
     return user
+
+
+async def get_or_create_user_by_username(
+    session: AsyncSession, username: str, role: str
+) -> User:
+    result = await session.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(username=username, role=role)
+        session.add(user)
+        await session.flush()
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Revoked tokens (persistent logout denylist)
+# ---------------------------------------------------------------------------
+
+async def revoke_token(
+    session: AsyncSession, jti: str, expires_at: datetime
+) -> None:
+    record = RevokedToken(jti=jti, expires_at=expires_at)
+    session.add(record)
+    await session.flush()
+
+
+async def is_token_revoked(session: AsyncSession, jti: str) -> bool:
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        select(RevokedToken).where(
+            RevokedToken.jti == jti,
+            RevokedToken.expires_at > now,
+        )
+    )
+    return result.scalar_one_or_none() is not None
 
 
 # ---------------------------------------------------------------------------

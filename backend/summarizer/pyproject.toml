@@ -30,4 +30,11 @@ markers = [
     "unit: fast, no I/O, no network, no Ollama",
     "summarizer: Summarizer service tests",
     "ai: requires a live Ollama model",
+    "slow: long-running tests (full-size PDFs, many LLM calls)",
+]
+filterwarnings = [
+    "ignore:builtin type Swi:DeprecationWarning",
+    "ignore:builtin type swigvarlink:DeprecationWarning",
+    "ignore:.*asyncio\\.iscoroutinefunction.*:DeprecationWarning",
+    "ignore::ResourceWarning:starlette",
 ]

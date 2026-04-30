@@ -5,7 +5,7 @@ from backend.summarizer.services.pdf_loader import load_pdf_from_bytes
 pytestmark = [pytest.mark.summarizer, pytest.mark.unit]
 from backend.shared.extraction import ExtractionResult, PageResult, ExtractionMeta
 
-def test_load_pdf_from_bytes():
+async def test_load_pdf_from_bytes():
     meta = ExtractionMeta(is_scanned=False, word_count=20, estimated_tokens=5, extraction_method="fitz")
     page1 = PageResult(page_num=1, text="Some extracted text for summarizer", char_count=34, used_vision=False)
     
@@ -21,7 +21,7 @@ def test_load_pdf_from_bytes():
         return result
 
     with patch('backend.summarizer.services.pdf_loader.extract_pdf', new=mock_extract):
-        docs, count = load_pdf_from_bytes(b"fake", chunk_size=100, chunk_overlap=10)
+        docs, count = await load_pdf_from_bytes(b"fake", chunk_size=100, chunk_overlap=10)
         
         assert count == 1
         assert len(docs) == 1

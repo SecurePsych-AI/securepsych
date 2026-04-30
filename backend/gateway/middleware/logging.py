@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -8,8 +9,9 @@ from starlette.responses import Response
 
 from config import settings
 
-# Setup logger directed to the encrypted log_dir
-LOG_DIR = Path(settings.storage.log_dir)
+# GATEWAY_LOG_DIR env var overrides config.yaml for local dev (where /mnt is read-only).
+# On the school server, leave GATEWAY_LOG_DIR unset — config.yaml provides the LUKS path.
+LOG_DIR = Path(os.environ.get("GATEWAY_LOG_DIR") or settings.storage.log_dir)
 
 logger = logging.getLogger("gateway.access")
 logger.setLevel(logging.INFO)

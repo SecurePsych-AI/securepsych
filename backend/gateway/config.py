@@ -35,10 +35,13 @@ def load_settings() -> Settings:
         
     settings = Settings(**config_data)
     
-    # FERPA Assertion: ensure all URLs point strictly to localhost.
+    from urllib.parse import urlparse
     for service_name, url in settings.services.model_dump().items():
-        if not url.startswith("http://localhost"):
-            raise RuntimeError(f"FERPA Violation: Service URL {service_name} must point to 'http://localhost'. Found: {url}")
+        parsed = urlparse(url)
+        if parsed.scheme != "http" or parsed.hostname not in ("localhost", "127.0.0.1"):
+            raise RuntimeError(
+                f"FERPA Violation: {service_name} must be http://localhost:<port>. Got: {url}"
+            )
 
     return settings
 
