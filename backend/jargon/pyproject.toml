@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "securepsych-jargon"
+version = "0.1.0"
+description = "SecurePsych AI — Jargon Simplifier microservice"
+authors = ["Natoli Tesgera"]
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.30.0" }
+langchain = "^0.3.0"
+langchain-ollama = "^0.2.0"
+langchain-core = "^0.3.0"
+langsmith = "^0.1.0"
+pydantic = "^2.0"
+pyyaml = "^6.0"
+pymupdf = "^1.24.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../.."]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, no I/O, no network, no Ollama",
+    "jargon: Jargon service tests",
+    "ai: requires a live Ollama model",
+]
+filterwarnings = [
+    "ignore:builtin type Swi:DeprecationWarning",
+    "ignore:builtin type swigvarlink:DeprecationWarning",
+    "ignore:.*asyncio\\.iscoroutinefunction.*:DeprecationWarning",
+    "ignore::ResourceWarning:starlette",
+]

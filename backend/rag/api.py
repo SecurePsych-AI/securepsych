@@ -12,59 +12,49 @@ Endpoints:
 """
 
 import os
+
+# ── Security: enforce LangSmith data-scrubbing before any LangChain import ────
+os.environ["LANGCHAIN_HIDE_INPUTS"] = "true"
+os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
+# ─────────────────────────────────────────────────────────────────────────────
+
 from typing import Literal
 
-import chromadb
-from chromadb.config import Settings
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
+from pydantic import BaseModel, field_validator
 
 load_dotenv()
 
 from rag_query import answer_question
-from ingestion import ingest_pdf_bytes
-
-# ---------------------------------------------------------------------------
-# Configuration (override via env vars)
-# ---------------------------------------------------------------------------
-CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma")
-COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
+from ingestion import ingest_pdf_bytes, ingest_from_preview, preview_pdf_bytes
+from chroma_client import _ensure_collection
 
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(title="RAG API", version="2.0")
 
-# ---------------------------------------------------------------------------
-# ChromaDB client (lazy singleton — mirrors ingestion.py and rag_query.py)
-# ---------------------------------------------------------------------------
-_client = None
-_collection = None
-
-
-def _get_collection():
-    global _client, _collection
-    if _collection is None:
-        _client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
+_MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB — guard against memory-exhaustion DoS
+_ALLOWED_CONTENT_TYPES = {"application/pdf", "application/octet-stream"}
 
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 class QueryRequest(BaseModel):
-    question: str
+    question:    str
+    student_id:  str
     document_id: str | None = None
-    mode: Literal["fast", "deep"] = "fast"
-    top_k: int = 3
+    mode:        Literal["fast", "deep"] = "fast"
+    top_k:       int = 3
+
+    @field_validator("student_id")
+    @classmethod
+    def student_id_must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("student_id is required and must not be empty")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -72,21 +62,52 @@ class QueryRequest(BaseModel):
 # Upload and ingest a PDF file into ChromaDB.
 #
 # Usage:
-#   curl -X POST http://localhost:8000/upload \
+#   curl -X POST http://localhost:8001/upload \
 #        -F "file=@sample_psycheval.pdf"
 # ---------------------------------------------------------------------------
 
-@app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
+@app.post("/upload/preview")
+async def preview_document(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
 
-    file_bytes = await file.read()
-
+    file_bytes = await file.read(_MAX_PDF_BYTES + 1)
+    if len(file_bytes) > _MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size.")
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    result = ingest_pdf_bytes(file_bytes, file.filename)
+    result = preview_pdf_bytes(file_bytes, file.filename)
+
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+
+    return result
+
+
+@app.post("/upload")
+async def upload_document(
+    file:          UploadFile = File(...),
+    student_id:    str        = Form(...),
+    strategy:      str        = Form("standard"),
+    preview_token: str | None = Form(None),
+):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
+
+    if preview_token:
+        result = ingest_from_preview(preview_token, student_id, strategy)
+    else:
+        file_bytes = await file.read(_MAX_PDF_BYTES + 1)
+        if len(file_bytes) > _MAX_PDF_BYTES:
+            raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size.")
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        result = ingest_pdf_bytes(file_bytes, file.filename, student_id, strategy)
 
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
@@ -99,13 +120,16 @@ async def upload_document(file: UploadFile = File(...)):
 # List all documents currently stored in ChromaDB.
 #
 # Usage:
-#   curl http://localhost:8000/documents
+#   curl http://localhost:8001/documents
 # ---------------------------------------------------------------------------
 
 @app.get("/documents")
-def list_documents():
-    collection = _get_collection()
-    results = collection.get(include=["metadatas"])
+def list_documents(student_id: str):
+    collection = _ensure_collection()
+    results = collection.get(
+        include=["metadatas"],
+        where={"student_id": student_id},
+    )
     metadatas = results.get("metadatas", [])
 
     # Deduplicate by document_id — one entry per document, not per chunk
@@ -131,12 +155,12 @@ def list_documents():
 # Remove all chunks belonging to a document from ChromaDB.
 #
 # Usage:
-#   curl -X DELETE http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
+#   curl -X DELETE http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6
 # ---------------------------------------------------------------------------
 
 @app.delete("/documents/{document_id}")
 def delete_document(document_id: str):
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     results = collection.get(
         where={"document_id": document_id},
@@ -173,12 +197,12 @@ def delete_document(document_id: str):
 # The gateway consumer forwards bytes as-is; downstream re-chunking handles the overlap.
 #
 # Usage:
-#   curl http://localhost:8000/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
+#   curl http://localhost:8001/documents/32f4419f-93d6-4a3f-a460-6c3e161318a6/content
 # ---------------------------------------------------------------------------
 
 @app.get("/documents/{document_id}/content")
 def get_document_content(document_id: str):
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     results = collection.get(
         where={"document_id": document_id},
@@ -214,7 +238,7 @@ def get_document_content(document_id: str):
 # Ask a question against an ingested document (or all documents).
 #
 # Usage:
-#   curl -X POST http://localhost:8000/query \
+#   curl -X POST http://localhost:8001/query \
 #        -H "Content-Type: application/json" \
 #        -d '{"question": "What medications were prescribed?", "document_id": "...", "mode": "fast"}'
 # ---------------------------------------------------------------------------
@@ -226,5 +250,6 @@ def query_document(request: QueryRequest):
         mode=request.mode,
         top_k=request.top_k,
         document_id=request.document_id,
+        student_id=request.student_id,
     )
     return result

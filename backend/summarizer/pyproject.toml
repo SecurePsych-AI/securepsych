@@ -19,11 +19,22 @@ python-multipart = "^0.0.12"
 pydantic = "^2.0"
 pyyaml = "^6.0"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
-pytest-asyncio = "^0.23.0"
-httpx = "^0.27.0"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../.."]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, no I/O, no network, no Ollama",
+    "summarizer: Summarizer service tests",
+    "ai: requires a live Ollama model",
+    "slow: long-running tests (full-size PDFs, many LLM calls)",
+]
+filterwarnings = [
+    "ignore:builtin type Swi:DeprecationWarning",
+    "ignore:builtin type swigvarlink:DeprecationWarning",
+    "ignore:.*asyncio\\.iscoroutinefunction.*:DeprecationWarning",
+    "ignore::ResourceWarning:starlette",
+]

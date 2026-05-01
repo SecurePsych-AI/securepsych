@@ -18,13 +18,15 @@ guards set unconditionally in main.py. Do not remove those guards.
 import logging
 import os
 
-import yaml
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaLLM
 
 logger = logging.getLogger(__name__)
+
+_OLLAMA_BASE_URL = os.environ["OLLAMA_BASE_URL"]
+_OLLAMA_MODEL = os.environ["OLLAMA_MODEL"]
 
 # ── Prompts ────────────────────────────────────────────────────────────────────
 
@@ -75,39 +77,16 @@ REFINED STRUCTURED SUMMARY:""",
 # ── Chain ──────────────────────────────────────────────────────────────────────
 
 
-def _load_config() -> dict:
-    path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
-    with open(path) as f:
-        return yaml.safe_load(f)
-
-
 async def run_summarize_chain(docs: list[Document]) -> str:
-    """
-    Run the Refine summarization chain over a list of LangChain Documents.
-
-    Processes chunks sequentially:
-      1. First chunk  → initial summary via _INITIAL_PROMPT
-      2. Each subsequent chunk → refine the running summary via _REFINE_PROMPT
-
-    All inference is routed through the local Ollama instance — zero outbound
-    network calls during a summarization request.
-
-    Args:
-        docs: Chunked Documents from pdf_loader.load_pdf_from_bytes()
-
-    Returns:
-        The final structured summary string.
-    """
-    cfg = _load_config()["summarizer"]
     logger.info(
         "[summarizer] Starting summarization — total chunks: %d", len(docs))
 
     llm = OllamaLLM(
-        model=cfg["model"],
-        base_url=cfg["ollama_base_url"],
+        model=_OLLAMA_MODEL,
+        base_url=_OLLAMA_BASE_URL,
     )
     logger.info("[summarizer] LLM initialised — model: %s | base_url: %s",
-                cfg["model"], cfg["ollama_base_url"])
+                _OLLAMA_MODEL, _OLLAMA_BASE_URL)
 
     initial_chain = _INITIAL_PROMPT | llm | StrOutputParser()
     refine_chain = _REFINE_PROMPT | llm | StrOutputParser()

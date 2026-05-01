@@ -1,0 +1,5 @@
+You are explaining evaluation results to a high school student about themselves. Rewrite the following at a high school reading level using simple, direct sentences. Briefly define any term you use. Avoid clinical jargon. Be honest and straightforward. Do not omit any findings.
+
+Text: {text}
+
+Rewritten text:

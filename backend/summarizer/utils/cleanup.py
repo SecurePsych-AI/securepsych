@@ -19,7 +19,13 @@ def _get_encrypted_temp_dir() -> str:
     cfg_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)
-    return cfg.get("summarizer", {}).get("encrypted_storage_path", "/tmp")
+    path = cfg.get("summarizer", {}).get("encrypted_storage_path")
+    if not path:
+        raise RuntimeError(
+            "summarizer.encrypted_storage_path must be set in config.yaml — "
+            "no /tmp fallback is permitted (FERPA requires LUKS-encrypted storage)."
+        )
+    return path
 
 
 @asynccontextmanager

@@ -27,17 +27,22 @@ Run at the bottom of this file (or via CLI):
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 import sys
+import time
 import uuid
 import argparse
 import textwrap
-from typing import Optional
+import asyncio
+from dataclasses import dataclass, field
+from pathlib import Path
+from cryptography.fernet import Fernet
 
-import fitz  # PyMuPDF
 import chromadb
-from chromadb.config import Settings
+from backend.shared.extraction import extract_pdf
+from backend.shared.redaction import redact_page
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -45,33 +50,17 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Configuration (override via env vars)
 # ---------------------------------------------------------------------------
-CHROMA_PATH: str     = os.getenv("CHROMA_PATH",      "./chroma")
-COLLECTION_NAME: str = os.getenv("CHROMA_COLLECTION", "securepsych_docs")
+CHROMA_PATH: str       = os.environ["CHROMA_PATH"]
+COLLECTION_NAME: str   = os.environ["CHROMA_COLLECTION"]
 
-CHUNK_SIZE: int    = int(os.getenv("CHUNK_SIZE",    "600"))
-CHUNK_OVERLAP: float = float(os.getenv("CHUNK_OVERLAP", "0.20"))  # 20% overlap (sliding-window only)
+CHUNK_SIZE: int        = int(os.environ["CHUNK_SIZE"])
+CHUNK_OVERLAP: float   = float(os.environ["CHUNK_OVERLAP"])  # decimal fraction, e.g. 0.10 = 10% overlap
 
-
-# ---------------------------------------------------------------------------
-# ChromaDB client — lazy singleton (mirrors rag_query.py and api.py)
-# ---------------------------------------------------------------------------
-_client: Optional[object] = None
-_collection: Optional[object] = None
+ENCRYPTED_ENTITY_MAP_PATH: str = os.environ["ENCRYPTED_ENTITY_MAP_PATH"]
+ENTITY_MAP_FERNET_KEY: bytes   = os.environ["ENTITY_MAP_FERNET_KEY"].encode()
 
 
-def _get_collection():
-    """Return (and lazily create) the ChromaDB collection."""
-    global _client, _collection
-    if _collection is None:
-        _client = chromadb.PersistentClient(
-            path=CHROMA_PATH,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
+from chroma_client import _ensure_collection
 
 
 # ---------------------------------------------------------------------------
@@ -128,35 +117,42 @@ def strip_boilerplate(text: str, boilerplate: set[str]) -> str:
     return cleaned.strip()
 
 
-def extract_pages(file_bytes: bytes) -> list[dict]:
-    """
-    Extract text from each PDF page with automatic boilerplate removal.
+OLLAMA_URL = os.environ["OLLAMA_BASE_URL"]
 
-    Two-pass process:
-    1. Extract raw text from all pages.
-    2. Detect boilerplate lines that repeat across pages.
-    3. Strip those lines and return clean page texts.
+def extract_pages(file_bytes: bytes, filename: str) -> tuple[list[dict], dict[str, str]]:
     """
-    doc = fitz.open(stream=io.BytesIO(file_bytes), filetype="pdf")
+    Extract text from each PDF page with automatic boilerplate removal and PII redaction.
+    Uses shared extract_pdf which falls back to Ollama vision.
+
+    Returns
+    -------
+    pages : list[dict]
+        Each {"page": int, "text": str} — text is already redacted.
+    entity_map : dict[str, str]
+        {"STUDENT_NAME_1": "Marcus Johnson", ...} — consistent across all pages.
+    """
+    extraction_result = asyncio.run(extract_pdf(file_bytes, filename, OLLAMA_URL))
 
     # Pass 1: collect raw text
-    raw = []
-    for page in doc:
-        raw.append(page.get_text("text").strip())
-    doc.close()
+    raw = [page.text for page in extraction_result.pages]
 
     # Pass 2: detect and strip boilerplate
     boilerplate = detect_boilerplate(raw)
     if boilerplate:
         print(f"  Auto-detected {len(boilerplate)} boilerplate line(s) — stripping before chunking.")
 
-    pages = []
-    for page_num, text in enumerate(raw, start=1):
-        cleaned = strip_boilerplate(text, boilerplate)
-        if cleaned:
-            pages.append({"page": page_num, "text": cleaned})
+    # Pass 3: redact PII with shared state so numbering is consistent across pages
+    counters: dict[str, int] = {}
+    combined_entity_map: dict[str, str] = {}
 
-    return pages
+    pages = []
+    for page_obj in extraction_result.pages:
+        cleaned = strip_boilerplate(page_obj.text, boilerplate)
+        if cleaned:
+            redacted_text = redact_page(cleaned, counters, combined_entity_map)
+            pages.append({"page": page_obj.page_num, "text": redacted_text})
+
+    return pages, combined_entity_map
 
 
 # ---------------------------------------------------------------------------
@@ -324,14 +320,31 @@ def build_page_chunks(
 # Ingest helpers
 # ---------------------------------------------------------------------------
 
+def _persist_entity_map(entity_map: dict[str, str]) -> str:
+    """
+    Encrypt and write entity_map to the LUKS-encrypted path.
+    Returns the redaction_key (UUID) used as the filename stem.
+    Only a UUID reference key is stored in ChromaDB — the map contents never leave the enc file.
+    """
+    redaction_key = str(uuid.uuid4())
+    fernet = Fernet(ENTITY_MAP_FERNET_KEY)
+    encrypted = fernet.encrypt(json.dumps(entity_map).encode("utf-8"))
+    dest = Path(ENCRYPTED_ENTITY_MAP_PATH) / f"{redaction_key}.enc"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(encrypted)
+    return redaction_key
+
+
 def _store_chunks(
-    chunks:      list[dict],
-    filename:    str,
-    document_id: str,
-    strategy:    str,
+    chunks:        list[dict],
+    filename:      str,
+    document_id:   str,
+    strategy:      str,
+    student_id:    str,
+    redaction_key: str,
 ) -> dict:
     """Write chunks to ChromaDB and return a summary dict."""
-    collection = _get_collection()
+    collection = _ensure_collection()
 
     ids:       list[str]  = []
     documents: list[str]  = []
@@ -350,6 +363,8 @@ def _store_chunks(
             "page_end":       chunk["page_end"],
             "token_estimate": chunk["token_estimate"],
             "strategy":       strategy,
+            "student_id":     student_id,
+            "redaction_key":  redaction_key,
         })
 
     # FIX: upsert (not add) so re-ingesting the same PDF is safe / idempotent
@@ -369,12 +384,15 @@ def _store_chunks(
         "strategy":         strategy,
         "chunks_added":     len(chunks),
         "avg_chunk_tokens": avg_tokens,
+        "student_id":       student_id,
+        "redaction_key":    redaction_key,
     }
 
 
 def ingest_pdf_bytes(
     file_bytes: bytes,
     filename:   str,
+    student_id: str,
     strategy:   str = "standard",
     chunk_size: int = CHUNK_SIZE,
 ) -> dict:
@@ -385,17 +403,19 @@ def ingest_pdf_bytes(
     ----------
     file_bytes : Raw bytes of the PDF file.
     filename   : Original filename, used as the ``source`` metadata field.
+    student_id : District student identifier — namespaces ChromaDB queries.
     strategy   : "standard" → sliding token window | "deep" → page-boundary chunks
     chunk_size : Target tokens per chunk.
 
     Returns
     -------
-    dict  {"status", "document_id", "source", "strategy", "chunks_added", "avg_chunk_tokens"}
+    dict  {"status", "document_id", "source", "strategy", "chunks_added", "avg_chunk_tokens",
+           "student_id", "redaction_key"}
     """
     if not file_bytes:
         return {"error": "Empty file bytes received.", "source": filename}
 
-    pages = extract_pages(file_bytes)
+    pages, entity_map = extract_pages(file_bytes, filename)
     if not pages:
         return {"error": f"No extractable text found in {filename}", "source": filename}
 
@@ -407,12 +427,14 @@ def ingest_pdf_bytes(
     if not chunks:
         return {"error": f"Could not produce any chunks from {filename}", "source": filename}
 
-    document_id = str(uuid.uuid4())
-    return _store_chunks(chunks, filename, document_id, strategy)
+    redaction_key = _persist_entity_map(entity_map)
+    document_id   = str(uuid.uuid4())
+    return _store_chunks(chunks, filename, document_id, strategy, student_id, redaction_key)
 
 
 def ingest_pdf(
     filepath:   str,
+    student_id: str = "cli",
     strategy:   str = "standard",
     chunk_size: int = CHUNK_SIZE,
 ) -> dict:
@@ -436,7 +458,7 @@ def ingest_pdf(
         file_bytes = f.read()
 
     filename = os.path.basename(filepath)
-    pages    = extract_pages(file_bytes)
+    pages, entity_map = extract_pages(file_bytes, filename)
 
     if not pages:
         return {"error": f"No extractable text found in {filename}", "source": filename}
@@ -449,8 +471,9 @@ def ingest_pdf(
     if not chunks:
         return {"error": f"Could not produce any chunks from {filename}", "source": filename}
 
-    document_id = str(uuid.uuid4())
-    summary     = _store_chunks(chunks, filename, document_id, strategy)
+    redaction_key = _persist_entity_map(entity_map)
+    document_id   = str(uuid.uuid4())
+    summary       = _store_chunks(chunks, filename, document_id, strategy, student_id, redaction_key)
 
     print(f"\nIngestion successful!")
     print(f"  File:            {summary['source']}")
@@ -468,7 +491,7 @@ def ingest_pdf(
 
 def list_sources() -> list[str]:
     """Return unique source filenames that have been ingested."""
-    collection = _get_collection()
+    collection = _ensure_collection()
     results    = collection.get(include=["metadatas"])
     sources    = {m["source"] for m in results["metadatas"] if m}
     return sorted(sources)
@@ -476,12 +499,82 @@ def list_sources() -> list[str]:
 
 def delete_source(source_name: str) -> int:
     """Remove all chunks belonging to *source_name*. Returns number of deleted chunks."""
-    collection     = _get_collection()
+    collection     = _ensure_collection()
     results        = collection.get(include=["metadatas"], where={"source": source_name})
     ids_to_delete  = results["ids"]
     if ids_to_delete:
         collection.delete(ids=ids_to_delete)
     return len(ids_to_delete)
+
+
+# ---------------------------------------------------------------------------
+# Two-step upload: preview cache
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _PreviewEntry:
+    pages:      list[dict]
+    entity_map: dict[str, str]
+    filename:   str
+    created_at: float = field(default_factory=time.monotonic)
+
+_preview_cache: dict[str, _PreviewEntry] = {}
+PREVIEW_TTL_SECONDS: int = 300  # 5 minutes
+
+
+def _store_preview(pages: list[dict], entity_map: dict[str, str], filename: str) -> str:
+    token = str(uuid.uuid4())
+    _preview_cache[token] = _PreviewEntry(pages=pages, entity_map=entity_map, filename=filename)
+    return token
+
+
+def _consume_preview(token: str) -> _PreviewEntry | None:
+    entry = _preview_cache.get(token)
+    if entry is None:
+        return None
+    if time.monotonic() - entry.created_at > PREVIEW_TTL_SECONDS:
+        del _preview_cache[token]
+        return None
+    del _preview_cache[token]
+    return entry
+
+
+def preview_pdf_bytes(file_bytes: bytes, filename: str) -> dict:
+    """Extract + redact without storing in ChromaDB. Returns preview_token and entity_map."""
+    if not file_bytes:
+        return {"error": "Empty file bytes received."}
+    pages, entity_map = extract_pages(file_bytes, filename)
+    if not pages:
+        return {"error": f"No extractable text found in {filename}"}
+    preview_token = _store_preview(pages, entity_map, filename)
+    return {
+        "preview_token": preview_token,
+        "sample_text":   pages[0]["text"][:2000],
+        "entity_map":    entity_map,
+        "page_count":    len(pages),
+        "filename":      filename,
+    }
+
+
+def ingest_from_preview(
+    preview_token: str,
+    student_id:    str,
+    strategy:      str = "standard",
+    chunk_size:    int = CHUNK_SIZE,
+) -> dict:
+    """Confirm ingest from a cached preview — avoids re-running extraction/redaction."""
+    entry = _consume_preview(preview_token)
+    if entry is None:
+        return {"error": "Preview token not found or expired."}
+    if strategy == "deep":
+        chunks = build_page_chunks(entry.pages, chunk_size=chunk_size)
+    else:
+        chunks = build_token_chunks(entry.pages, chunk_size=chunk_size)
+    if not chunks:
+        return {"error": f"Could not produce any chunks from {entry.filename}"}
+    redaction_key = _persist_entity_map(entry.entity_map)
+    document_id   = str(uuid.uuid4())
+    return _store_chunks(chunks, entry.filename, document_id, strategy, student_id, redaction_key)
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +611,7 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
         file_bytes = f.read()
 
     filename = os.path.basename(filepath)
-    pages    = extract_pages(file_bytes)
+    pages, _ = extract_pages(file_bytes, filename)
 
     if not pages:
         print("ERROR: No extractable text found — aborting benchmark.")

@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 from main import app
 
+pytestmark = [pytest.mark.summarizer, pytest.mark.unit]
+
 client = TestClient(app)
 
 
@@ -42,7 +44,31 @@ def test_summarize_rejects_non_pdf(tmp_path):
     assert response.status_code == 422
 
 
-def test_summarize_document_id_returns_501():
-    """document_id path is stubbed until RAG ingestion store is ready."""
-    response = client.post("/summarize", data={"document_id": "some-doc-id"})
-    assert response.status_code == 501
+@pytest.mark.ai
+def test_summarize_smoke_ollama_small(tiny_eval_pdf):
+    """Tiny synthetic PDF → 1 chunk → 1 Ollama call. Completes in ~30s."""
+    with open(tiny_eval_pdf, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("tiny_eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
+
+
+@pytest.mark.ai
+@pytest.mark.slow
+def test_summarize_smoke_ollama(redacted_eval_pdf_1):
+    """Upload a real hand-scrubbed PDF and verify Ollama returns a non-empty summary."""
+    with open(redacted_eval_pdf_1, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
+

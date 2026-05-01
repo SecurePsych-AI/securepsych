@@ -1,0 +1,90 @@
+{
+  "_description": "Mock payloads for the RAG service as seen through the API Gateway (port 8000). All requests require Authorization: Bearer <token>.",
+
+  "upload_request": {
+    "method": "POST",
+    "url": "http://localhost:8000/api/rag/upload",
+    "content_type": "multipart/form-data",
+    "fields": {
+      "file": "<binary PDF>",
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "strategy": "standard"
+    }
+  },
+
+  "upload_response_200": {
+    "status": "ok",
+    "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+    "source": "eval_2024_REDACTED.pdf",
+    "strategy": "standard",
+    "chunks_added": 187,
+    "avg_chunk_tokens": 512
+  },
+  "_upload_note": "student_id and redaction_key are stripped by the gateway before this response reaches the client. They never cross the gateway→client boundary.",
+
+  "query_request": {
+    "method": "POST",
+    "url": "http://localhost:8000/api/rag/query",
+    "content_type": "application/json",
+    "body": {
+      "question": "What cognitive assessments were administered and what were the composite scores?",
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+      "thread_id": null,
+      "mode": "fast",
+      "top_k": 3
+    }
+  },
+
+  "query_response_200": {
+    "answer": "The Wechsler Intelligence Scale for Children (WISC-V) was administered. The student obtained a Full Scale IQ (FSIQ) composite score of 88, placing performance in the Low Average range (25th percentile). The Verbal Comprehension Index was 92 and the Processing Speed Index was 79.",
+    "mode": "fast",
+    "top_k": 3,
+    "thread_id": "cc1d2e3f-4a5b-6c7d-8e9f-a0b1c2d3e4f5",
+    "sources": [
+      {
+        "source": "eval_2024_REDACTED.pdf",
+        "page": 12,
+        "parent_id": "12_2",
+        "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98"
+      },
+      {
+        "source": "eval_2024_REDACTED.pdf",
+        "page": 13,
+        "parent_id": "13_0",
+        "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98"
+      }
+    ]
+  },
+
+  "documents_list_request": {
+    "method": "GET",
+    "url": "http://localhost:8000/api/rag/documents?project_id=a1b2c3d4-0001-0001-0001-000000000001"
+  },
+
+  "documents_list_response_200": {
+    "total_documents": 2,
+    "documents": [
+      {
+        "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+        "filename": "eval_2024_REDACTED.pdf"
+      },
+      {
+        "document_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "filename": "iep_2024_REDACTED.pdf"
+      }
+    ]
+  },
+
+  "error_responses": {
+    "400_missing_project_id": {
+      "detail": "project_id is required"
+    },
+    "404_project_not_found": {
+      "detail": "Project not found or access denied"
+    },
+    "422_invalid_file": {
+      "detail": "Only PDF files are supported."
+    }
+  }
+}
