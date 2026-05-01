@@ -604,7 +604,7 @@ def run_benchmark(filepath: str, n_results: int = 3) -> None:
     print(f"File: {filepath}")
     print("=" * 72)
 
-    bench_client     = chromadb.EphemeralClient()
+    bench_client     = chromadb.EphemeralClient(settings=chromadb.Settings(anonymized_telemetry=False))
     bench_collection = bench_client.get_or_create_collection(name="securepsych_docs_benchmark")
 
     with open(filepath, "rb") as f:

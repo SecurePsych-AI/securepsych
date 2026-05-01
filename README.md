@@ -10,16 +10,16 @@ Student data never leaves the building. This repository never contains student d
 
 ## Project Status
 
-| Phase | Name                                              | Dates           | Status          |
-| ----- | ------------------------------------------------- | --------------- | --------------- |
-| 0     | Research Sprint                                   | Feb 24 – Mar 5  | **Complete**    |
-| 1     | Infrastructure & Scaffold                         | Mar 6 – Mar 10  | **ON-HOLD**     |
-| 2     | Core RAG + Summarization                          | Mar 11 – Mar 28 | **IN PROGRESS** |
-| 3     | Jargon Simplifier                                 | Mar 29 – Apr 11 | **IN PROGRESS**     |
-| 4     | API Gateway & Auth                               | Apr 12 – Apr 25 | **IN PROGRESS**     |
-| 5     | Security Audit, Documentation Update | Apr 26 – May 2   | **IN PROGRESS**     |
+| Phase | Name                                  | Dates           | Status       |
+| ----- | ------------------------------------- | --------------- | ------------ |
+| 0     | Research Sprint                       | Feb 24 – Mar 5  | **Complete** |
+| 1     | Infrastructure & Scaffold             | Mar 6 – Mar 10  | **Complete** |
+| 2     | Core RAG + Summarization              | Mar 11 – Mar 28 | **Complete** |
+| 3     | Jargon Simplifier                     | Mar 29 – Apr 11 | **Complete** |
+| 4     | API Gateway & Auth                    | Apr 12 – Apr 25 | **Complete** |
+| 5     | Security Audit, Documentation Update  | Apr 26 – May 2  | **Complete** |
 
-**First external milestone:** April 2026 stakeholder demo.
+**Active workstream:** Frontend integration and stakeholder demo prep.
 
 ---
 
@@ -74,21 +74,23 @@ LangSmith tracing: metadata only (token counts, latency). No document content tr
 
 ## Technology Stack
 
-| Layer              | Tool                                                  | Status                   |
-| ------------------ | ----------------------------------------------------- | ------------------------ |
-| LLM Runtime        | Ollama (on-prem)                                      | Confirmed                |
-| Base Model         | TBD — benchmark in Phase 1                            | Pending                  |
-| AI Framework       | LangChain or LlamaIndex                               | Pending (Research 7)     |
-| Vector Store       | ChromaDB (local, embedded)                            | Confirmed                |
-| Indexing Strategy  | TBD                                                   | Pending (Research 1 & 2) |
-| PDF Processing     | PyMuPDF (`fitz`)                                      | Confirmed                |
-| Backend API        | FastAPI (Python)                                      | Confirmed                |
-| Frontend           | React + Vite + TailwindCSS                            | Confirmed                |
-| Auth               | Local JWT (`python-jose`) — no external auth provider | Confirmed                |
-| Monitoring         | LangSmith (metadata-only tracing)                     | Confirmed                |
-| CI/CD              | Gitea + Woodpecker CI (self-hosted)                   | Confirmed                |
-| OS                 | Ubuntu Server 24.04 LTS                               | Confirmed                |
-| Storage Encryption | LUKS/fscrypt at OS level                              | Confirmed                |
+| Layer              | Tool                                                  | Status                              |
+| ------------------ | ----------------------------------------------------- | ----------------------------------- |
+| LLM Runtime        | Ollama (on-prem)                                      | Confirmed                           |
+| Base Model         | Operator-selected (mistral:7b / llama3 benchmarked)   | Confirmed                           |
+| AI Framework       | LangChain (LangGraph for RAG pipeline)                | Confirmed                           |
+| Vector Store       | ChromaDB (local, embedded)                            | Confirmed                           |
+| Indexing Strategy  | Hierarchical chunk + MMR retrieval (ChromaDB)         | Confirmed                           |
+| PDF Processing     | PyMuPDF (`fitz`)                                      | Confirmed                           |
+| Backend API        | FastAPI (Python) — 3 microservices + API gateway      | Confirmed — feature-complete        |
+| Frontend           | React + Vite + TailwindCSS                            | Confirmed — integration in progress |
+| Auth               | Local JWT (`python-jose`) — no external auth provider | Confirmed                           |
+| Monitoring         | LangSmith (metadata-only tracing, dev only)           | Confirmed                           |
+| CI/CD              | Gitea + Woodpecker CI (self-hosted)                   | Confirmed                           |
+| OS                 | Ubuntu Server 24.04 LTS                               | Confirmed                           |
+| Storage Encryption | LUKS/fscrypt at OS level                              | Confirmed                           |
+
+> **Backend status (May 2026):** All three microservices (RAG, Summarizer, Jargon) are feature-complete. The API gateway ships JWT auth, RBAC, per-user ownership, access logging, and student data isolation. The FERPA compliance checklist is current — 34 of 39 items complete, 5 remaining TODOs are infrastructure-level (TLS cert deployment, log rotation cron). Frontend integration is the active workstream.
 
 ---
 

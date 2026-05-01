@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
@@ -22,9 +23,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    _raw_origins = os.environ.get("CORS_ALLOWED_ORIGINS")
+    if not _raw_origins:
+        raise RuntimeError("CORS_ALLOWED_ORIGINS is required. Set it in .env (e.g. http://localhost:5173).")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[o.strip() for o in _raw_origins.split(",") if o.strip()],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

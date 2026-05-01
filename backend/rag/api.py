@@ -12,6 +12,7 @@ Endpoints:
 """
 
 import os
+import sys
 
 # ── Security: enforce LangSmith data-scrubbing before any LangChain import ────
 os.environ["LANGCHAIN_HIDE_INPUTS"] = "true"
@@ -25,6 +26,16 @@ from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from pydantic import BaseModel, field_validator
 
 load_dotenv()
+
+# ── FERPA: CHROMA_PATH must resolve to the LUKS-encrypted mount in production ─
+_chroma_path = os.environ.get("CHROMA_PATH", "")
+if os.environ.get("SECUREPSYCH_ENV") != "test" and not _chroma_path.startswith("/mnt/securepsych/"):
+    sys.exit(
+        "FERPA VIOLATION: CHROMA_PATH must be set to the LUKS-encrypted mount "
+        f"(e.g. /mnt/securepsych/data/chroma). Current value: '{_chroma_path}'. "
+        "Set SECUREPSYCH_ENV=test to bypass in development."
+    )
+# ─────────────────────────────────────────────────────────────────────────────
 
 from rag_query import answer_question
 from ingestion import ingest_pdf_bytes, ingest_from_preview, preview_pdf_bytes
