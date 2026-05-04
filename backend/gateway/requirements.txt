@@ -3,5 +3,6 @@ uvicorn
 python-jose[cryptography]
 httpx
 python-dotenv
+pyyaml>=6.0
 sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.20.0
