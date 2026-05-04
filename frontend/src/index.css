@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+
+    --primary: 174 73% 26%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 174 75% 21%;
+    --primary-soft: 170 50% 93%;
+
+    --secondary: 240 5% 97%;
+    --secondary-foreground: 0 0% 12%;
+
+    --muted: 240 5% 97%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 174 73% 26%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 86% 97%;
+
+    --success: 142 71% 30%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 142 76% 96%;
+
+    --warning: 32 81% 36%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 48 100% 96%;
+
+    --border: 0 0% 90%;
+    --border-strong: 220 13% 82%;
+    --input: 0 0% 90%;
+    --ring: 174 73% 26%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: theme("fontFamily.sans");
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+@layer components {
+  .trust-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium;
+  }
+  .trust-pill-success {
+    @apply trust-pill border-success-soft bg-success-soft text-success;
+  }
+  .trust-pill-accent {
+    @apply trust-pill border-primary-soft bg-primary-soft text-primary;
+  }
+  .trust-pill-warning {
+    @apply trust-pill border-warning-soft bg-warning-soft text-warning;
+  }
+}

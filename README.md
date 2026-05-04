@@ -18,8 +18,9 @@ Student data never leaves the building. This repository never contains student d
 | 3     | Jargon Simplifier                     | Mar 29 – Apr 11 | **Complete** |
 | 4     | API Gateway & Auth                    | Apr 12 – Apr 25 | **Complete** |
 | 5     | Security Audit, Documentation Update  | Apr 26 – May 2  | **Complete** |
+| 6     | Frontend (Variation B) + Demo Prep    | May 1 – May 4   | **MVP done** |
 
-**Active workstream:** Frontend integration and stakeholder demo prep.
+**Active workstream:** Stakeholder demo (May 4). Frontend MVP runs against MSW mocks by default; live-backend mode is verified for auth + project CRUD.
 
 ---
 
@@ -94,36 +95,34 @@ LangSmith tracing: metadata only (token counts, latency). No document content tr
 
 ---
 
-## Getting Started (Phase 1+)
-
-> Full setup guide will be in `/docs/jumpstart/` once Phase 1 infrastructure is live.
+## Getting Started (local dev)
 
 **Prerequisites:**
 
-- Access to the team's on-prem server (LAN only — get the static IP from Kai or Arpita)
-- Python 3.11+, Node.js 20+, Docker
-- Ollama installed and model pulled (see `/docs/jumpstart/`)
+- Python 3.11+ (Python 3.13 verified), Node.js 20+
+- Ollama (optional — only needed for live LLM responses; the demo path uses MSW mocks)
 
-**Environment setup:**
+**One-time setup:**
 
 ```bash
-# Clone the repo
-git clone https://github.com/securepsych-ai/securepsych.git
-cd securepsych
+# 1. Backend venv + install all 4 service requirements
+py -3.13 -m venv backend\.venv
+backend\.venv\Scripts\python -m pip install --upgrade pip
+backend\.venv\Scripts\python -m pip install -r backend\gateway\requirements.txt -r backend\rag\requirements.txt -r backend\summarizer\requirements.txt -r backend\jargon\requirements.txt -r backend\requirements-dev.txt
 
-# Copy environment template
-cp .env.example .env
-# Fill in values — ask Natoli or Arpita for local server config
+# 2. Generate dev .env files for the 4 backend services (random secrets, SECUREPSYCH_ENV=test)
+py -3.13 scripts\setup_backend_dev_env.py
 
-# Backend (from /backend/rag, or any service)
-poetry install
-uvicorn main:app --reload --port 8001
-
-# Frontend
+# 3. Frontend deps + auto-install of the MSW service worker
 cd frontend
 npm install
-npm run dev
 ```
+
+**Run the stack:** see [`.claude/launch.json`](.claude/launch.json) for the canonical dev-server configs (gateway 8000, rag 8001, summarizer 8002, jargon 8003, frontend 5173). Detailed walkthrough — including the MSW mock toggle and the demo script — lives in [`docs/jumpstart/FRONTEND_DEV.md`](docs/jumpstart/FRONTEND_DEV.md).
+
+**Demo creds (dev only):** `dr.lee` / `demo-pass-2026` (overridable in `backend/gateway/.env`).
+
+**Live-backend troubleshooting:** if you re-clone or change Python paths, see [`docs/troubleshooting/dev-env-fixes.md`](docs/troubleshooting/dev-env-fixes.md) for the three patches that make the services run from a fresh venv on Windows.
 
 ---
 
