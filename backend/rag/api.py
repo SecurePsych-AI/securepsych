@@ -21,11 +21,12 @@ os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
 
 from typing import Literal
 
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from pydantic import BaseModel, field_validator
 
-load_dotenv()
+load_dotenv(Path(__file__).parent / ".env")
 
 # ── FERPA: CHROMA_PATH must resolve to the LUKS-encrypted mount in production ─
 _chroma_path = os.environ.get("CHROMA_PATH", "")
@@ -90,7 +91,12 @@ async def preview_document(file: UploadFile = File(...)):
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    result = preview_pdf_bytes(file_bytes, file.filename)
+    # preview_pdf_bytes is sync but internally calls asyncio.run() to invoke
+    # the async PDF extractor. Running it directly inside this async handler
+    # would crash with "asyncio.run() cannot be called from a running event
+    # loop". Off-loading to a thread gives the inner call its own event loop.
+    import asyncio
+    result = await asyncio.to_thread(preview_pdf_bytes, file_bytes, file.filename)
 
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
@@ -98,27 +104,47 @@ async def preview_document(file: UploadFile = File(...)):
     return result
 
 
-@app.post("/upload")
-async def upload_document(
-    file:          UploadFile = File(...),
-    student_id:    str        = Form(...),
-    strategy:      str        = Form("standard"),
-    preview_token: str | None = Form(None),
-):
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-    if file.content_type not in _ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
+from fastapi import Request
 
+@app.post("/upload")
+async def upload_document(request: Request):
+    """Accept either `file` (multipart upload) OR `preview_token` (commit a
+    pre-staged preview). Manual form parsing because FastAPI's `File(None)`
+    still rejects requests that omit the file field on this version."""
+    form = await request.form()
+    student_id = form.get("student_id")
+    strategy = form.get("strategy") or "standard"
+    preview_token = form.get("preview_token")
+    file = form.get("file")
+
+    if not student_id:
+        raise HTTPException(status_code=422, detail="student_id is required")
+    if not file and not preview_token:
+        raise HTTPException(
+            status_code=422,
+            detail="Either 'file' or 'preview_token' must be provided.",
+        )
+    if file:
+        if not file.filename or not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        if file.content_type not in _ALLOWED_CONTENT_TYPES:
+            raise HTTPException(status_code=415, detail="Only PDF files are supported.")
+
+    import asyncio
     if preview_token:
-        result = ingest_from_preview(preview_token, student_id, strategy)
+        # Same asyncio.run() concern as the preview handler — run in a thread.
+        result = await asyncio.to_thread(
+            ingest_from_preview, preview_token, student_id, strategy
+        )
     else:
         file_bytes = await file.read(_MAX_PDF_BYTES + 1)
         if len(file_bytes) > _MAX_PDF_BYTES:
             raise HTTPException(status_code=413, detail="PDF exceeds maximum allowed size.")
         if not file_bytes:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-        result = ingest_pdf_bytes(file_bytes, file.filename, student_id, strategy)
+        result = await asyncio.to_thread(
+            ingest_pdf_bytes, file_bytes, file.filename, student_id, strategy
+        )
 
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
