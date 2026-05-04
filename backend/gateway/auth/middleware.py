@@ -23,9 +23,13 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             raise ValueError(f"Unknown auth backend: {settings.auth.backend}")
             
     async def dispatch(self, request: Request, call_next):
+        # CORS preflight requests must pass through so the browser can
+        # negotiate cross-origin headers before the real request is sent.
+        if request.method == "OPTIONS":
+            return await call_next(request)
         if request.url.path in EXEMPT_PATHS:
             return await call_next(request)
-            
+
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid Authorization header"})

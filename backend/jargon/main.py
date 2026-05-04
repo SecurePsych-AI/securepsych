@@ -1,4 +1,10 @@
+import logging
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
 
 # ── Security: enforce LangSmith data-scrubbing before any LangChain import ────
 # LANGCHAIN_HIDE_INPUTS/OUTPUTS stop LangSmith from capturing prompt payloads
@@ -8,7 +14,6 @@ os.environ["LANGCHAIN_HIDE_INPUTS"] = "true"
 os.environ["LANGCHAIN_HIDE_OUTPUTS"] = "true"
 # ─────────────────────────────────────────────────────────────────────────────
 
-import logging
 import yaml
 from fastapi import FastAPI
 from routes import health, simplify

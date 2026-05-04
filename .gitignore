@@ -13,6 +13,12 @@ dist/
 .pytest_cache/
 pytest.ini
 *local*
+dev_data/
+
+# Author-local scratch — Claude-generated context, scratch notes, etc.
+# Anything purposeless on the remote goes here and stays out of git.
+docs-local/
+CLAUDE.md
 
 # Allow some pdfs
 !docs/checklist/RAG_POC_Checklist.pdf

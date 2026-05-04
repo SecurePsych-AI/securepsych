@@ -1,8 +1,12 @@
 import httpx
 from typing import Dict, Any
 
-# Connection pool maintained globally for proxy instances
-shared_client = httpx.AsyncClient(timeout=60.0)
+# Connection pool maintained globally for proxy instances.
+# read=300s accommodates summarize/RAG calls that hit Ollama for cold-loaded
+# models (~30–90s) plus the 90s summarize SLA on a 24-page document.
+shared_client = httpx.AsyncClient(
+    timeout=httpx.Timeout(connect=10.0, read=300.0, write=60.0, pool=10.0)
+)
 
 async def proxy_request(
     method: str,

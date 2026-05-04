@@ -65,9 +65,9 @@ async def summarize(request: Request):
     if sum_resp.status_code == 200 and project_id:
         sum_data = sum_resp.json()
         async with AsyncSessionLocal() as session:
-            project = await crud.get_project_by_id(session, project_id, user_id)
-            if project:
-                async with session.begin():
+            async with session.begin():
+                project = await crud.get_project_by_id(session, project_id, user_id)
+                if project:
                     await crud.log_summary_run(
                         session,
                         project_id=project_id,
@@ -76,8 +76,8 @@ async def summarize(request: Request):
                         summary=sum_data.get("summary", ""),
                         page_count=sum_data.get("page_count", 0),
                     )
-            else:
-                logger.warning("summarize: project_id %s not found for user %s — skipping persistence", project_id, user_id)
+                else:
+                    logger.warning("summarize: project_id %s not found for user %s — skipping persistence", project_id, user_id)
         return Response(content=sum_resp.content, status_code=sum_resp.status_code, media_type=sum_resp.headers.get("content-type"))
 
     if sum_resp.status_code == 200 and not project_id:

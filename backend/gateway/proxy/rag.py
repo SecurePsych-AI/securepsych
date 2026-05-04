@@ -42,14 +42,26 @@ async def preview_document(request: Request, file: UploadFile = File(...)):
 
 
 @router.post("/upload")
-async def upload_document(
-    request: Request,
-    file: UploadFile = File(...),
-    project_id: str = Form(...),
-    strategy: str = Form("standard"),
-    preview_token: str | None = Form(None),
-):
+async def upload_document(request: Request):
+    """Accept either a file upload OR a preview_token (mutually exclusive).
+
+    Manual form parsing is used because FastAPI's `File(None)` with
+    `UploadFile | None` still rejects requests that omit the file field.
+    """
     user_id = getattr(request.state, "user_id", "unauthenticated")
+
+    form = await request.form()
+    project_id = form.get("project_id")
+    strategy = form.get("strategy") or "standard"
+    preview_token = form.get("preview_token")
+    file = form.get("file")
+    if not project_id:
+        return JSONResponse(status_code=422, content={"detail": "project_id is required"})
+    if not file and not preview_token:
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Either 'file' or 'preview_token' must be provided."},
+        )
 
     async with AsyncSessionLocal() as session:
         student_id_hash = await _resolve_project(session, project_id, user_id)
@@ -57,11 +69,13 @@ async def upload_document(
     if not student_id_hash:
         return JSONResponse(status_code=404, content={"detail": "Project not found or access denied"})
 
-    file_bytes = await file.read()
-    files = {"file": (file.filename, file_bytes, file.content_type)}
     data = {"student_id": student_id_hash, "strategy": strategy}
+    files = None
     if preview_token:
         data["preview_token"] = preview_token
+    elif file:
+        file_bytes = await file.read()
+        files = {"file": (file.filename, file_bytes, file.content_type)}
 
     resp = await proxy_request(
         method="POST",
@@ -80,7 +94,10 @@ async def upload_document(
                     session,
                     project_id=project_id,
                     document_id=rag_data.get("document_id", ""),
-                    filename_redacted=rag_data.get("source", file.filename),
+                    filename_redacted=rag_data.get(
+                        "source",
+                        getattr(file, "filename", None) or "uploaded.pdf",
+                    ),
                     strategy=rag_data.get("strategy", strategy),
                     chunks_added=rag_data.get("chunks_added", 0),
                 )

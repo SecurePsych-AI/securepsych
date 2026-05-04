@@ -50,10 +50,10 @@ async def simplify_jargon(request: Request):
     if resp.status_code == 200 and project_id:
         jargon_data = resp.json()
         async with AsyncSessionLocal() as session:
-            project = await crud.get_project_by_id(session, project_id, user_id)
-            if project:
-                preview = (input_text or "")[:200]
-                async with session.begin():
+            async with session.begin():
+                project = await crud.get_project_by_id(session, project_id, user_id)
+                if project:
+                    preview = (input_text or "")[:200]
                     await crud.log_jargon_run(
                         session,
                         project_id=project_id,
@@ -62,8 +62,8 @@ async def simplify_jargon(request: Request):
                         simplified_text=jargon_data.get("simplified_text", ""),
                         fk_grade=jargon_data.get("flesch_kincaid_grade", 0.0),
                     )
-            else:
-                logger.warning("simplify: project_id %s not found for user %s — skipping persistence", project_id, user_id)
+                else:
+                    logger.warning("simplify: project_id %s not found for user %s — skipping persistence", project_id, user_id)
 
     if resp.status_code == 200 and not project_id:
         logger.warning("simplify: no project_id provided — output will not be persisted")

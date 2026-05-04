@@ -34,14 +34,21 @@ def test_summarize_requires_input():
     assert response.status_code == 422
 
 
-def test_summarize_rejects_non_pdf(tmp_path):
-    """Uploading a non-PDF file must return 422."""
-    fake_file = tmp_path / "test.txt"
-    fake_file.write_text("not a pdf")
-    with open(fake_file, "rb") as f:
+def test_summarize_rejects_unsupported_file_type(tmp_path):
+    """Uploading a file that is neither PDF nor plain text must return 415.
+
+    Note: as of the gateway-Mode-B fix, the route accepts both `.pdf` and
+    `.txt` / `text/plain` so the gateway can forward already-extracted
+    document text. Other content types (e.g. images) are still rejected.
+    """
+    fake_image = tmp_path / "test.png"
+    fake_image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    with open(fake_image, "rb") as f:
         response = client.post(
-            "/summarize", files={"file": ("test.txt", f, "text/plain")})
-    assert response.status_code == 422
+            "/summarize",
+            files={"file": ("test.png", f, "image/png")},
+        )
+    assert response.status_code == 415
 
 
 @pytest.mark.ai

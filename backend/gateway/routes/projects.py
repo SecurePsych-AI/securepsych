@@ -1,5 +1,6 @@
 import json
 import re
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -30,7 +31,10 @@ def _has_pii(text: str) -> bool:
 # ---------------------------------------------------------------------------
 
 class CreateProjectRequest(BaseModel):
-    student_id: str
+    # Optional: when omitted (or empty), the server hashes a random per-project
+    # UUID so the project is created without an external-ID linkage. Matches
+    # the design spec's "Internal student ID (optional)" field.
+    student_id: str | None = None
     display_label: str | None = None
 
     @field_validator("display_label")
@@ -121,7 +125,10 @@ def _require_user(request: Request) -> str:
 async def create_project(body: CreateProjectRequest, request: Request):
     user_id = _require_user(request)
     role = getattr(request.state, "role", "psychologist")
-    h = hash_student_id(body.student_id)
+    # Hash a random UUID when student_id is omitted so the (NOT NULL) hash
+    # column is satisfied without the user fabricating a placeholder.
+    raw_student_id = (body.student_id or "").strip() or f"anon-{uuid.uuid4()}"
+    h = hash_student_id(raw_student_id)
     async with AsyncSessionLocal() as session:
         async with session.begin():
             await crud.get_or_create_user(session, user_id, role)
