@@ -5,16 +5,25 @@ from sqlalchemy import event
 from .models import Base
 
 
+_ENCRYPTED_PREFIXES = (
+    "/mnt/securepsych/",       # Linux production (LUKS)
+    "/Volumes/securepsych/",   # macOS dev (encrypted disk image)
+)
+
+
 def _get_db_path() -> str:
     path = os.environ.get("GATEWAY_DB_PATH")
     if not path:
         raise RuntimeError("GATEWAY_DB_PATH must be set in environment — no fallback permitted.")
     # LUKS boundary check is skipped only in an explicitly declared test environment.
     # SECUREPSYCH_ENV=test must be set in test conftest; it must never appear in production config.
-    if os.environ.get("SECUREPSYCH_ENV") != "test" and not path.startswith("/mnt/securepsych/"):
+    if os.environ.get("SECUREPSYCH_ENV") != "test" and not any(
+        path.startswith(p) for p in _ENCRYPTED_PREFIXES
+    ):
         raise RuntimeError(
-            f"FERPA Violation: GATEWAY_DB_PATH must be under /mnt/securepsych/ (got '{path}'). "
-            "Database must reside on the LUKS-encrypted mount."
+            f"FERPA Violation: GATEWAY_DB_PATH must be under /mnt/securepsych/ (Linux) or "
+            f"/Volumes/securepsych/ (macOS dev) — got '{path}'. "
+            "Database must reside on an encrypted mount."
         )
     return path
 
