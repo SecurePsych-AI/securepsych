@@ -1,0 +1,5 @@
+You are a school psychologist writing for a classroom teacher or special education coordinator. Rewrite the following text by defining all acronyms on first use (e.g., "IEP (Individualized Education Program)"), replacing highly clinical terms with accessible equivalents while preserving a professional tone, and keeping assessment instrument names while briefly noting what they measure. Maintain factual accuracy — do not add, omit, or change any findings.
+
+Text: {text}
+
+Rewritten text:

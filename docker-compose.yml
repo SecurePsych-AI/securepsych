@@ -1,0 +1,104 @@
+services:
+
+  # ─── API Gateway (port 8000) ─────────────────────────────────────────────
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/gateway/.env
+    environment:
+      SECUREPSYCH_ENV: docker
+      RAG_SERVICE_URL: http://rag:8001
+      SUMMARIZER_SERVICE_URL: http://summarizer:8002
+      JARGON_SERVICE_URL: http://jargon:8003
+      GATEWAY_DB_PATH: /mnt/securepsych/data/gateway/gateway.db
+      GATEWAY_LOG_DIR: /mnt/securepsych/data/gateway/logs
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:4173,http://localhost:3000,http://localhost:80,http://localhost
+    volumes:
+      - securepsych-gateway:/mnt/securepsych/data/gateway
+    depends_on:
+      rag:
+        condition: service_started
+      summarizer:
+        condition: service_started
+      jargon:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─── RAG Q&A Service (internal only) ─────────────────────────────────────
+  rag:
+    build:
+      context: ./backend
+      dockerfile: rag/Dockerfile
+    expose:
+      - "8001"
+    env_file:
+      - ./backend/rag/.env
+    environment:
+      # Ollama runs on the host machine, not in Docker.
+      # On Mac/Windows Docker Desktop: host.docker.internal resolves automatically.
+      # On Linux: uncomment the extra_hosts section below.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      CHROMA_PATH: /mnt/securepsych/data/chroma
+      ENCRYPTED_ENTITY_MAP_PATH: /mnt/securepsych/data/entity_maps
+    volumes:
+      - securepsych-chroma:/mnt/securepsych/data/chroma
+      - securepsych-entities:/mnt/securepsych/data/entity_maps
+    restart: unless-stopped
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"  # Uncomment on Linux
+
+  # ─── Summarizer Service (internal only) ──────────────────────────────────
+  summarizer:
+    build:
+      context: ./backend
+      dockerfile: summarizer/Dockerfile
+    expose:
+      - "8002"
+    env_file:
+      - ./backend/summarizer/.env
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    restart: unless-stopped
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"  # Uncomment on Linux
+
+  # ─── Jargon Simplifier Service (internal only) ───────────────────────────
+  jargon:
+    build:
+      context: ./backend
+      dockerfile: jargon/Dockerfile
+    expose:
+      - "8003"
+    env_file:
+      - ./backend/jargon/.env
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    restart: unless-stopped
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"  # Uncomment on Linux
+
+  # ─── Frontend (port 80) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # For LAN deployment (users on other machines), set this to the server IP:
+        #   VITE_API_BASE_URL: http://192.168.1.50:8000
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+# ─── Persistent volumes ───────────────────────────────────────────────────
+# Production: back these with the LUKS-encrypted partition by configuring
+# Docker's volume storage location to /mnt/securepsych (school IT task).
+volumes:
+  securepsych-gateway:
+  securepsych-chroma:
+  securepsych-entities:

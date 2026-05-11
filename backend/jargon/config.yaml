@@ -1,0 +1,8 @@
+# config.yaml — committed
+simplification:
+  default_level: 3
+  min_level: 1
+  max_level: 5
+
+storage:
+  temp_dir: "/mnt/securepsych/data/temp/jargon"

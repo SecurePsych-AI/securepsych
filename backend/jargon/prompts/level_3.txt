@@ -1,0 +1,5 @@
+You are a school psychologist speaking directly to a parent at a meeting about their child's evaluation. Rewrite the following in plain, warm, reassuring English. Rules: spell out all acronyms in full, replace clinical jargon with everyday language, use "your child" naturally throughout, explain what scores mean in practical terms (e.g., "scored in the average range, which means..."), and maintain a supportive and encouraging tone. Do not change or omit any findings — accuracy is essential. Write as if speaking kindly to someone who loves their child and wants to understand what the evaluation found.
+
+Text: {text}
+
+Rewritten text:

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SecurePsych — Hi-fi explorations</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <script type="text/babel" src="variation-a.jsx"></script>
+  <script type="text/babel" src="variation-a-extra.jsx"></script>
+  <script type="text/babel" src="variation-b.jsx"></script>
+  <script type="text/babel" src="variation-b-extra.jsx"></script>
+  <script type="text/babel" src="variation-c.jsx"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { DesignCanvas, DCSection, DCArtboard } = window;
+    const A = { ...window.VariationA, ...window.VariationAExtra };
+    const B = { ...window.VariationB, ...window.VariationBExtra };
+    const C = window.VariationC;
+
+    const W = 1280, H = 820;
+
+    function App() {
+      return (
+        <DesignCanvas title="SecurePsych — Hi-fi explorations" subtitle="Three directions across the demo-critical surfaces. Drag to pan, scroll to zoom, click an artboard to focus.">
+          <DCSection id="a" title="Variation A — Classic ChatGPT-style"
+            description="Rail + horizontal tabs · footnote citations · table-style PII review. The most conventional, closest to the spec.">
+            <DCArtboard id="a-login" label="Login" width={W} height={H}><A.A_Login/></DCArtboard>
+            <DCArtboard id="a-dashboard" label="Dashboard (no project)" width={W} height={H}><A.A_Dashboard/></DCArtboard>
+            <DCArtboard id="a-create" label="Create project · PII validation" width={W} height={H}><A.A_CreateProject/></DCArtboard>
+            <DCArtboard id="a-pii" label="Upload → PII Review (table)" width={W} height={H}><A.A_PIIReview/></DCArtboard>
+            <DCArtboard id="a-chat" label="RAG Q&A · footnote citations" width={W} height={H}><A.A_Chat/></DCArtboard>
+            <DCArtboard id="a-summarize" label="Summarizer" width={W} height={H}><A.A_Summarizer/></DCArtboard>
+            <DCArtboard id="a-jargon" label="Jargon Simplifier" width={W} height={H}><A.A_Jargon/></DCArtboard>
+            <DCArtboard id="a-summary-prog" label="Summarizer · in-progress" width={W} height={H}><A.A_SummarizerInProgress/></DCArtboard>
+            <DCArtboard id="a-history" label="History timeline" width={W} height={H}><A.A_History/></DCArtboard>
+            <DCArtboard id="a-delete" label="Delete document confirm" width={W} height={H}><A.A_DeleteConfirm/></DCArtboard>
+            <DCArtboard id="a-expired" label="Session expired toast" width={W} height={H}><A.A_SessionExpired/></DCArtboard>
+          </DCSection>
+
+          <DCSection id="b" title="Variation B — Unified composer"
+            description="Single welcome composer that fans out into Ask / Summarize / Simplify · side-panel citations · side-by-side PII comparison. Reduces tab-juggling for the demo.">
+            <DCArtboard id="b-login" label="Login (split)" width={W} height={H}><B.B_Login/></DCArtboard>
+            <DCArtboard id="b-dashboard" label="Dashboard · unified composer" width={W} height={H}><B.B_Dashboard/></DCArtboard>
+            <DCArtboard id="b-pii" label="PII Review (side-by-side)" width={W} height={H}><B.B_PIIReview/></DCArtboard>
+            <DCArtboard id="b-chat" label="RAG Q&A · side-panel citations" width={W} height={H}><B.B_Chat/></DCArtboard>
+            <DCArtboard id="b-summarize" label="Summarizer · sectioned nav" width={W} height={H}><B.B_Summarizer/></DCArtboard>
+            <DCArtboard id="b-jargon" label="Jargon · level strip + split panes" width={W} height={H}><B.B_Jargon/></DCArtboard>
+            <DCArtboard id="b-create" label="Create project" width={W} height={H}><B.B_CreateProject/></DCArtboard>
+            <DCArtboard id="b-summary-prog" label="Summarizer · in-progress" width={W} height={H}><B.B_SummarizerInProgress/></DCArtboard>
+            <DCArtboard id="b-history" label="History · card grid" width={W} height={H}><B.B_History/></DCArtboard>
+            <DCArtboard id="b-delete" label="Delete document confirm" width={W} height={H}><B.B_DeleteConfirm/></DCArtboard>
+          </DCSection>
+
+          <DCSection id="c" title="Variation C — Tool palette / cockpit"
+            description="Thin icon rail (Slack-style project switcher) · pill tool palette inside each project · inline citation chips · annotated diff PII. Project-first, dense, more bespoke.">
+            <DCArtboard id="c-login" label="Login (centered, minimal)" width={W} height={H}><C.C_Login/></DCArtboard>
+            <DCArtboard id="c-dashboard" label="Project cockpit · tool palette" width={W} height={H}><C.C_Dashboard/></DCArtboard>
+            <DCArtboard id="c-pii" label="PII Review (annotated diff)" width={W} height={H}><C.C_PIIReview/></DCArtboard>
+            <DCArtboard id="c-chat" label="RAG Q&A · inline chip citations" width={W} height={H}><C.C_Chat/></DCArtboard>
+            <DCArtboard id="c-history" label="History · vertical timeline" width={W} height={H}><C.C_History/></DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

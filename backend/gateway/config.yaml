@@ -1,0 +1,16 @@
+features:
+  rag_enabled: true
+  summarizer_enabled: true
+  jargon_enabled: true
+
+auth:
+  backend: "local_jwt"       # "local_jwt" | "school_directory"
+  token_expiry_hours: 8
+
+services:
+  rag_url: "http://localhost:8001"
+  summarizer_url: "http://localhost:8002"
+  jargon_url: "http://localhost:8003"
+
+storage:
+  log_dir: "/mnt/securepsych/data/gateway/logs"

@@ -1,0 +1,81 @@
+"""
+Basic smoke tests for the Summarizer service.
+Run with: pytest tests/ -v
+
+These tests do NOT require Ollama or a real PDF. They verify the FastAPI
+app boots and the health endpoint responds correctly.
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from main import app
+
+pytestmark = [pytest.mark.summarizer, pytest.mark.unit]
+
+client = TestClient(app)
+
+
+def test_health_returns_200():
+    response = client.get("/health")
+    assert response.status_code == 200
+
+
+def test_health_payload():
+    response = client.get("/health")
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "summarizer"
+
+
+def test_summarize_requires_input():
+    """Calling /summarize with no file and no document_id must return 422."""
+    response = client.post("/summarize")
+    assert response.status_code == 422
+
+
+def test_summarize_rejects_unsupported_file_type(tmp_path):
+    """Uploading a file that is neither PDF nor plain text must return 415.
+
+    Note: as of the gateway-Mode-B fix, the route accepts both `.pdf` and
+    `.txt` / `text/plain` so the gateway can forward already-extracted
+    document text. Other content types (e.g. images) are still rejected.
+    """
+    fake_image = tmp_path / "test.png"
+    fake_image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    with open(fake_image, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("test.png", f, "image/png")},
+        )
+    assert response.status_code == 415
+
+
+@pytest.mark.ai
+def test_summarize_smoke_ollama_small(tiny_eval_pdf):
+    """Tiny synthetic PDF → 1 chunk → 1 Ollama call. Completes in ~30s."""
+    with open(tiny_eval_pdf, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("tiny_eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
+
+
+@pytest.mark.ai
+@pytest.mark.slow
+def test_summarize_smoke_ollama(redacted_eval_pdf_1):
+    """Upload a real hand-scrubbed PDF and verify Ollama returns a non-empty summary."""
+    with open(redacted_eval_pdf_1, "rb") as f:
+        response = client.post(
+            "/summarize",
+            files={"file": ("eval.pdf", f, "application/pdf")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"]
+    assert body["page_count"] > 0
+

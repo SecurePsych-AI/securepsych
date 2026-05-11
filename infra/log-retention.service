@@ -1,0 +1,11 @@
+[Unit]
+Description=SecurePsych — delete access logs older than GATEWAY_LOG_RETENTION_DAYS
+
+[Service]
+Type=oneshot
+User=securepsych
+EnvironmentFile=/opt/securepsych/backend/gateway/.env
+ExecStart=/bin/sh -c 'find "${GATEWAY_LOG_DIR:-/mnt/securepsych/data/gateway/logs}" \
+    -name "access_*.log" \
+    -mtime +"${GATEWAY_LOG_RETENTION_DAYS:-30}" \
+    -delete'

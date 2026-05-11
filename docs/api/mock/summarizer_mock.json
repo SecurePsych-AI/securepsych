@@ -1,0 +1,42 @@
+{
+  "_description": "Mock payloads for the Summarizer service as seen through the API Gateway (port 8000). All requests require Authorization: Bearer <token>.",
+
+  "mode_a_request": {
+    "_note": "Mode A — direct PDF upload",
+    "method": "POST",
+    "url": "http://localhost:8000/api/summarize",
+    "content_type": "multipart/form-data",
+    "fields": {
+      "file": "<binary PDF>",
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "mode_b_request": {
+    "_note": "Mode B — summarize a document already ingested into RAG",
+    "method": "POST",
+    "url": "http://localhost:8000/api/summarize",
+    "content_type": "application/json",
+    "body": {
+      "document_id": "f7e6d5c4-b3a2-9180-7654-3210fedcba98",
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "response_200": {
+    "summary": "Psychoeducational Evaluation Summary\n\nStudent Information: The student is a 10-year-old in 4th grade. Evaluation was completed on March 15, 2024 by a licensed school psychologist.\n\nReferral Concerns: Difficulties with reading fluency, comprehension, and written expression; possible ADHD concerns.\n\nCognitive Assessment (WISC-V):\n- Full Scale IQ: 88 (Low Average, 25th percentile)\n- Verbal Comprehension Index: 92 (Average)\n- Fluid Reasoning Index: 85 (Low Average)\n- Processing Speed Index: 79 (Below Average, 8th percentile)\n\nAcademic Achievement (WIAT-4):\n- Word Reading: 74 (4th percentile) — significantly below grade level\n- Reading Comprehension: 78 (7th percentile)\n- Spelling: 76 (5th percentile)\n- Math Problem Solving: 91 (27th percentile)\n\nDiagnoses Indicated: Specific Learning Disability in Reading (Dyslexia). ADHD Inattentive Type is noted as a differential requiring further evaluation.\n\nRecommendations: Specialized reading instruction (Orton-Gillingham approach), extended time on assessments, preferential seating, and a reading specialist pull-out program 3x/week.",
+    "page_count": 24
+  },
+
+  "error_responses": {
+    "400_missing_document_id": {
+      "detail": "Missing document_id in JSON body"
+    },
+    "415_unsupported_content_type": {
+      "detail": "Unsupported Content-Type. Expected application/json or multipart/form-data"
+    },
+    "422_non_pdf": {
+      "detail": "Only PDF files are accepted."
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "_description": "Mock payloads for the Jargon Simplifier service as seen through the API Gateway (port 8000). All requests require Authorization: Bearer <token>. Levels: 1=Psychologist, 2=Educator, 3=Parent (default), 4=High school student, 5=Elementary child.",
+
+  "level_1_request": {
+    "_note": "Level 1 — psychologist-to-psychologist, clinical terminology preserved",
+    "method": "POST",
+    "url": "http://localhost:8000/api/jargon/simplify",
+    "content_type": "application/json",
+    "body": {
+      "text": "The examinee demonstrated significant deficits in phonological processing as measured by the CTOPP-2, with a Phonological Memory Composite of 74 (4th percentile) and a Phonological Awareness Composite of 71 (3rd percentile), consistent with a diagnosis of Specific Learning Disability in Reading per DSM-5 criteria.",
+      "level": 1,
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "level_1_response_200": {
+    "simplified_text": "The student presents with deficits in phonological processing (CTOPP-2: Phonological Memory Composite SS=74, 4th percentile; Phonological Awareness Composite SS=71, 3rd percentile). These findings meet DSM-5 diagnostic criteria for Specific Learning Disorder with Impairment in Reading (315.00), consistent with a profile of developmental dyslexia.",
+    "flesch_kincaid_grade": 14.2,
+    "level": 1
+  },
+
+  "level_3_request": {
+    "_note": "Level 3 — parent-friendly explanation (default)",
+    "method": "POST",
+    "url": "http://localhost:8000/api/jargon/simplify",
+    "content_type": "application/json",
+    "body": {
+      "text": "The examinee demonstrated significant deficits in phonological processing as measured by the CTOPP-2, with a Phonological Memory Composite of 74 (4th percentile) and a Phonological Awareness Composite of 71 (3rd percentile), consistent with a diagnosis of Specific Learning Disability in Reading per DSM-5 criteria.",
+      "level": 3,
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "level_3_response_200": {
+    "simplified_text": "The testing showed that your child has difficulty with the sound-based building blocks of reading — things like remembering the sounds in words and recognizing how words break into smaller sound parts. These are skills that are important for learning to read. The scores were in the low range compared to other children the same age, which is why the evaluation found that your child has a reading learning disability (sometimes called dyslexia). This is something we can directly support with the right teaching approach.",
+    "flesch_kincaid_grade": 7.1,
+    "level": 3
+  },
+
+  "level_5_request": {
+    "_note": "Level 5 — elementary-age child explanation",
+    "method": "POST",
+    "url": "http://localhost:8000/api/jargon/simplify",
+    "content_type": "application/json",
+    "body": {
+      "text": "The examinee demonstrated significant deficits in phonological processing as measured by the CTOPP-2.",
+      "level": 5,
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "level_5_response_200": {
+    "simplified_text": "Some people find it harder to hear all the little sounds in words. Like, the word 'cat' has three sounds: k-a-t. Your brain sometimes has a tough time with that, and that's okay! It just means you learn to read in a slightly different way, and teachers can help you with special reading games and activities.",
+    "flesch_kincaid_grade": 3.8,
+    "level": 5
+  },
+
+  "pdf_upload_request": {
+    "_note": "Multipart form upload — simplify extracted text from a PDF",
+    "method": "POST",
+    "url": "http://localhost:8000/api/jargon/simplify",
+    "content_type": "multipart/form-data",
+    "fields": {
+      "file": "<binary PDF>",
+      "level": "3",
+      "project_id": "a1b2c3d4-0001-0001-0001-000000000001"
+    }
+  },
+
+  "error_responses": {
+    "422_invalid_level": {
+      "detail": [{"loc": ["body", "level"], "msg": "Input should be less than or equal to 5"}]
+    },
+    "422_missing_text": {
+      "detail": [{"loc": ["body", "text"], "msg": "Field required"}]
+    },
+    "503_disabled": {
+      "detail": "Jargon service not enabled"
+    }
+  }
+}
